@@ -205,7 +205,7 @@ const PX = (() => {
     G: '#e8b04a', g: '#a8742a', Y: '#ffe2a0',
     B: '#e9dfc8', b: '#b9ad93',
     E: '#ff8a3c', e: '#c9481e', d: '#7a2a14',
-    C: '#8fc7ff', c: '#4f86c6',
+    C: '#7dd3fc', c: '#0ea5e9',
     S: '#9aa3b0', s: '#5b6472', k: '#353b49',
     W: '#8a6a48', w: '#5a4330',
     P: '#f57a94', v: '#42b862', f: '#ffffff',
@@ -235,6 +235,18 @@ const PX = (() => {
       '.oeEEeo.',
       '..oooo..',
     ],
+    bolt: [
+      '....oo..',
+      '...oCo..',
+      '..oCCo..',
+      '.oCfCo..',
+      'oCCfCCo.',
+      'oooCCCo.',
+      '..oCCo..',
+      '.oCco...',
+      '.oco....',
+      '..o.....',
+    ],
     skull: [
       '..ooooo..',
       '.oBBBBBo.',
@@ -257,17 +269,6 @@ const PX = (() => {
       'WeEe.eEe',
       'Wed...de',
       'W.......',
-    ],
-    hourglass: [
-      'WWWWWWW',
-      '.S...S.',
-      '.SGGGS.',
-      '..SGS..',
-      '...S...',
-      '..SGS..',
-      '.S.G.S.',
-      '.SGGGS.',
-      'WWWWWWW',
     ],
     sound: [
       '...B......',
@@ -303,51 +304,6 @@ const PX = (() => {
       'BoeeBBBBBeeoB',
       '..ooeeeeeoo..',
       '....ooooo....',
-    ],
-    bombard: [
-      '.............',
-      '...........S.',
-      '.........Sso.',
-      '.......SSSso.',
-      '.E...SSSSsks.',
-      '.e.SSSSsssk..',
-      '.SSSSssss....',
-      'sSSssssww....',
-      'sssssooowww..',
-      '.sswoWWWowww.',
-      '...woWSWowww.',
-      '....oWWWo....',
-      '.....ooo.....',
-    ],
-    spire: [
-      '.....C.......',
-      '....CCc......',
-      '....CCc....C.',
-      '.....c....CC.',
-      '.........CC..',
-      '....sSk.CCCC.',
-      '....sSk...Cc.',
-      '....sCk..Cc..',
-      '....sSk..c...',
-      '...ssSkk.....',
-      '...sSSSk.....',
-      '..ssSSSkk....',
-      '..sssskkk....',
-    ],
-    guard: [
-      '..........oB.',
-      '.sssssss.oBBo',
-      '.sCCCCCCoBBo.',
-      '.sCCCCCoBBo..',
-      '.sCCccoBBo.s.',
-      '.sCCcoBBocCs.',
-      '.sCo.BBocCCs.',
-      '.sGGoBocCCCs.',
-      '..GGGocCCCs..',
-      '.oGoGGoCCCs..',
-      'oGo.sGocCs...',
-      '.o...sscs....',
-      '......ss.....',
     ],
     upgrade: [
       '....Y....',
@@ -392,19 +348,26 @@ const PX = (() => {
       '.oBBBBbo.',
       '..ooooo..',
     ],
-    star: [
-      '..Y..',
-      'YGGGG',
-      '.GGG.',
-      'GG.Gg',
-      'G...g',
+    slotFire: [
+      '.ooo.',
+      'oYEEo',
+      'oEEeo',
+      'oeeeo',
+      '.ooo.',
     ],
-    starEmpty: [
-      '..s..',
-      'sssss',
-      '.sss.',
-      'ss.ss',
-      's...s',
+    slotElec: [
+      '.ooo.',
+      'ofCCo',
+      'oCCco',
+      'occco',
+      '.ooo.',
+    ],
+    slotEmpty: [
+      '.ooo.',
+      'oksko',
+      'os.so',
+      'oksko',
+      '.ooo.',
     ],
   };
 
@@ -463,7 +426,7 @@ const UI = (() => {
     touch: false, ptrs: new Map(), gest: null, lastTap: { t: -9, x: 0, y: 0 }, waveRect: null, followRect: null, menuRect: null, wake: null, panning: false,
     hud: [], tips: [], tip: null, keys: new Set(), sndArmed: false, vvT: 0, vvN: 0,
   };
-  const COLR = { bg: 'rgba(9,11,17,0.86)', bg2: 'rgba(24,27,38,0.94)', bd: '#5d4c35', bdHi: '#e8b04a', tx: '#efe4cd', dim: '#a79e8a', amber: '#e8b04a', ember: '#ff8a3c', cold: '#8fc7ff', red: '#e5553c', dark: '#0b0d14', ok: '#9fd08a' };
+  const COLR = { bg: 'rgba(9,11,17,0.86)', bg2: 'rgba(24,27,38,0.94)', bd: '#5d4c35', bdHi: '#e8b04a', tx: '#efe4cd', dim: '#a79e8a', amber: '#e8b04a', ember: '#ff8a3c', cold: '#7dd3fc', red: '#e5553c', dark: '#0b0d14', ok: '#9fd08a' };
   const _pv = new THREE.Vector3(), _o = new THREE.Vector3(), _d = new THREE.Vector3();
   function proj(x, y, z) { _pv.set(x, y, z).project(R.cam); return { x: (_pv.x * .5 + .5) * R.dw, y: (1 - (_pv.y * .5 + .5)) * R.dh }; }
   U.proj = proj;
@@ -545,10 +508,21 @@ const UI = (() => {
       if (PAN[e.code] && !e.ctrlKey && !e.metaKey && !e.altKey) { U.keys.add(e.code); e.preventDefault(); }
       if (e.repeat) return; audioGesture(); U.keepAwake(); U.touch = false;
       const k = e.key;
-      if (k >= '1' && k <= '4') { pickKind(TOWER_KINDS[+k - 1]); e.preventDefault(); }
+      if (k === '1') {
+        const t = (U.menu && U.menu.tower) || (U.hover && U.hover.tower);
+        if (t) { touchInput(); doMutate(t, 'fire'); } else pickKind('archer');
+        e.preventDefault();
+      }
+      else if (k === '2' || k === 'e' || k === 'E') {
+        const t = (U.menu && U.menu.tower) || (U.hover && U.hover.tower);
+        if (t) { touchInput(); doMutate(t, 'elec'); e.preventDefault(); }
+      }
+      else if (k === 'u' || k === 'U') {
+        const t = (U.menu && U.menu.tower) || (U.hover && U.hover.tower);
+        if (t) { touchInput(); doMutate(t, 'fire'); }
+      }
       else if (k === ' ' || k === 'Enter') { callWave(); e.preventDefault(); }
       else if (k === 'Escape') { U.closeMenu(); }
-      else if (k === 'u' || k === 'U') { const t = (U.menu && U.menu.tower) || (U.hover && U.hover.tower); if (t) { touchInput(); doUpgrade(t); } }
       else if (k === 'x' || k === 'X' || k === 'Delete' || k === 'Backspace') { const t = U.menu && U.menu.tower; if (t) { touchInput(); if (U.menu.sellArm) doSell(t); else { U.menu.sellArm = true; sfx('uiHover', t.x, t.z, .8); } } }
       else if (k === 'p' || k === 'P') { togglePause(); }
       else if (k === 'Tab') { cycleSpeed(); e.preventDefault(); }
@@ -592,8 +566,8 @@ const UI = (() => {
   function touchInput() { U.idle = 0; U.manual = true; }
   function toggleCommand() { U.setManual(!U.manual); U.idle = 0; sfx('uiClick', CAM.x, CAM.z, .8); }
   function deny() { U.deny = 1; sfx('uiDeny', CAM.x, CAM.z, .6); buzz([18, 40, 18]); }
-  function doBuild(pad, kind) { touchInput(); if (buildTower(pad, kind, true)) { sfx('uiClick', pad.x, pad.z, .8); buzz(12); U.menu = null; U.armed = null; return true; } deny(); return false; }
-  function doUpgrade(t) { if (upgradeTower(t, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); if (t.kind !== 'archer' || t.lvl >= (t.def.maxLvl ?? 2)) U.menu = null; return true; } deny(); return false; }
+  function doBuild(pad, kind) { touchInput(); if (buildTower(pad, kind || 'archer', true)) { sfx('uiClick', pad.x, pad.z, .8); buzz(12); U.menu = null; U.armed = null; return true; } deny(); return false; }
+  function doMutate(t, elem) { if (mutateTower(t, elem, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); if (t.lvl >= 4) U.menu = null; return true; } deny(); return false; }
   function doSell(t) { if (sellTower(t)) { U.menu = null; return true; } return false; }
   function pickKind(kind) {
     touchInput();
@@ -653,7 +627,7 @@ const UI = (() => {
     if (!ax && !ay) st.t = 0;
     if (hit(0)) { touchInput(); audioGesture(); st.active = true; if (st.sel < 0) st.sel = 0; if (U.menu) { const bt = U.btns[U.menu.focus]; if (bt) bt.fn(); } else { const pad = G.B.pads[st.sel]; U.menu = { pad, tower: pad.tower, t: 0, focus: 0, sel: null, sellArm: false }; sfx('uiHover', pad.x, pad.z, .9); } }
     if (hit(1)) { U.closeMenu(); touchInput(); }
-    if (hit(2)) { const pad = st.sel >= 0 ? G.B.pads[st.sel] : null; if (pad && pad.tower) { touchInput(); doUpgrade(pad.tower); } }
+    if (hit(2)) { const pad = st.sel >= 0 ? G.B.pads[st.sel] : null; if (pad && pad.tower) { touchInput(); doMutate(pad.tower, 'fire'); } }
     if (hit(3) || hit(9)) callWave();
     for (let i = 0; i < 16; i++) st.prev[i] = b(i);
   }
@@ -681,8 +655,15 @@ const UI = (() => {
     if (tgt && G.B && G.phase === 'play') {
       const pad = tgt.pad, pulse = .5 + .5 * Math.sin(G.t * 5);
       setRing(U.padMesh, pad.x, pad.z, 1.5, .1); U.padMesh.material.opacity = .45 + .25 * pulse;
-      let range = 0; if (tgt.tower) range = tgt.tower.range; else { const kind = (U.menu && (U.menu.sel || (U.hotBtn && U.hotBtn.kind))) || U.armed || (U.menu && U.btns[U.menu.focus] && U.gp.active && U.btns[U.menu.focus].kind) || 'archer'; range = TOWER[kind].range[0]; }
-      setRing(U.rangeMesh, pad.x, pad.z, range, .07); U.rangeMesh.material.opacity = .34;
+      let range = TOWER.archer.range[0], rCol = [1.5, 1.15, .6];
+      if (tgt.tower) {
+        const previewElem = U.menu && U.hotBtn && U.hotBtn.elem;
+        const pr = (previewElem && tgt.tower.lvl < 4) ? catProfile(tgt.tower.dna.concat([previewElem])) : tgt.tower.prof;
+        range = pr.range;
+        rCol = pr.model === 'elec' ? [.55, 1.45, 2.0] : (pr.model === 'fire' ? [1.9, .85, .35] : [1.5, 1.15, .6]);
+      }
+      U.rangeMesh.material.color.setRGB(rCol[0], rCol[1], rCol[2]);
+      setRing(U.rangeMesh, pad.x, pad.z, range, .07); U.rangeMesh.material.opacity = .36;
     } else { U.padMesh.visible = false; U.rangeMesh.visible = false; }
     R.canvas.style.cursor = U.panning ? 'grabbing' : (U.hotBtn || U.hover || U.hudHot) ? 'pointer' : 'default';
   }
@@ -772,8 +753,8 @@ const UI = (() => {
     } else {
       const first = U.titleT < 16, a = tch ? sat(Math.min(U.titleT - 7.2, first ? 1 : 3 - U.moved, U.manual && !first ? 0 : 1, 62 - U.titleT)) : sat(Math.min(U.titleT - 7.2, 3 - Math.min(U.moved, U.idle > 20 ? U.moved : 0) + (U.titleT < 18 ? 8 : 0)));
       if (a > .02 && !U.menu && !G.paused) {
-        const parts = tch ? ['Tap a pad to build', 'Drag to look around', 'Pinch or double-tap to zoom'] : ['Click a pad to build', '1-4 pick a tower', 'Space calls the next wave', 'Wheel zooms, drag moves the view'];
-        let lines = [parts.join(' · ')]; if (tw(lines[0]) + pad * 2 > boxW) { lines = parts.length > 3 ? [parts.slice(0, 2).join(' · '), parts.slice(2).join(' · ')] : parts; if (lines.some(l => tw(l) + pad * 2 > boxW)) lines = parts; }
+        const parts = tch ? ['Tap a pad to place a cat', 'Tap a cat to mutate DNA', 'Pinch to zoom'] : ['Click pad: Gatto Base', 'Click cat: Fuoco (1) / Laser (2)', 'P pause · Space next wave'];
+        let lines = [parts.join(' · ')]; if (tw(lines[0]) + pad * 2 > boxW) { lines = parts; }
         let w = 0; for (const l of lines) w = Math.max(w, tw(l)); w += pad * 2; const h = LH * lines.length + pad * 2 - s, hx = Math.round((iL + Wr - w) / 2), hy = yUp - h;
         if (w <= boxW) { c.globalAlpha = a; plate(hx, hy, w, h); lines.forEach((l, k) => text(l, hx + w / 2, hy + pad - s + k * LH, COLR.dim, { align: 'c' })); c.globalAlpha = 1; }
       }
@@ -791,68 +772,105 @@ const UI = (() => {
     U.menuRect = null;
     if (U.menu && G.phase === 'play') {
       const m = U.menu, p = proj(m.pad.x, m.pad.y + (m.tower ? Math.min(3.6, m.tower.mounts.top) : 1.2), m.pad.z), a = sat(m.t * 8), mp = 6 * s;
-      const button = (bx, by, bw2, bh2, id, enabled, fn, kind, on) => {
+      const button = (bx, by, bw2, bh2, id, enabled, fn, extra) => {
         const ov = over(bx, by, bw2, bh2) && !U.gp.active, focused = U.gp.active && U.btns.length === m.focus;
-        const b = { id, fn, kind, x: bx, y: by, w: bw2, h: bh2 }; U.btns.push(b); if (ov) hot = b; const down = U.press === id, lit = ov || focused || on || down;
+        const b = Object.assign({ id, fn, x: bx, y: by, w: bw2, h: bh2 }, extra || {}); U.btns.push(b); if (ov) hot = b; const down = U.press === id, lit = ov || focused || (extra && extra.on) || down;
         plate(bx, by + (down ? s : 0), bw2, bh2, { bg: lit ? COLR.bg2 : 'rgba(16,18,27,0.96)', bd: lit ? COLR.bdHi : (enabled ? COLR.bd : '#3a342c'), hi: lit ? 'rgba(232,176,74,0.18)' : null });
         return { lit, dy: down ? s : 0 };
       };
       const place = (wP, hP) => { const below = p.y - hP - 7 * s < y0 + topH + 2 * s && p.y + 26 * s + hP < Hb - 4 * s; return [clamp(Math.round(p.x - wP / 2), 4 * s + iL, Wr - wP - 4 * s), below ? Math.round(p.y + 26 * s) : clamp(Math.round(p.y - hP - 7 * s), Math.min(y0 + topH + 4 * s, Hb - hP - 4 * s), Hb - hP - 4 * s)]; };
       c.globalAlpha = a;
       if (!m.tower) {
-        const bwid = 31 * s, bh = 35 * s, gapb = 3 * s, rowW = 4 * bwid + 3 * gapb;
-        let lit = null; const fk = U.gp.active ? TOWER_KINDS[m.focus % 4] : null;
-        const lines = k => k ? [TOWER[k].name].concat(TOWER[k].desc) : tch ? ['Choose a tower', 'Tap one to see what it does,', 'then tap it again to build.'] : ['Choose a tower', 'Hover or press 1 to 4', 'to see what each does.'];
-        let textW = tw('Tap again to build'); for (const k of [null].concat(TOWER_KINDS)) for (const l of lines(k)) textW = Math.max(textW, tw(l));
-        const wP = Math.max(rowW, textW) + mp * 2, hP = mp * 2 + LH + 3 * s + bh + 4 * s + LH * 3 + 2 * s + (tch ? LH + s : 0), [px, py] = place(wP, hP);
+        // Piazzamento diretto del Gatto Base (50 DNA) — GDD 3.7
+        const d = TOWER.archer, can = G.gold >= d.cost[0];
+        const l1 = d.desc[0], l2 = d.desc[1], btnLbl = 'Piazza Gatto Base · ' + d.cost[0];
+        const [iw, ih] = PX.iconSize('archer');
+        const bh = Math.max((ih + 8) * s, (tch ? 26 : 21) * s);
+        const wBtn = iw * s + 10 * s + tw(btnLbl) + 12 * s;
+        const wP = Math.max(wBtn, tw(l1), tw(l2)) + mp * 2;
+        const hP = mp * 2 + LH + 3 * s + bh + 4 * s + LH * 2 + 2 * s;
+        const [px, py] = place(wP, hP);
         U.menuRect = { x: px, y: py, w: wP, h: hP };
-        plate(px, py, wP, hP); text('Build here', px + mp, py + mp - s, COLR.amber);
-        const bx0 = px + Math.round((wP - rowW) / 2), by = py + mp + LH + 3 * s;
-        TOWER_KINDS.forEach((kind, i) => {
-          const d = TOWER[kind], can = G.gold >= d.cost[0], bx = bx0 + i * (bwid + gapb);
-          const r = button(bx, by, bwid, bh, 'b' + kind, can, () => { if (U.touch && m.sel !== kind) { m.sel = kind; sfx('uiHover', m.pad.x, m.pad.z, .8); } else doBuild(m.pad, kind); }, kind, m.sel === kind);
-          const [iw, ih] = PX.iconSize(d.icon); PX.icon(c, d.icon, bx + Math.round((bwid - iw * s) / 2), by + 6 * s + r.dy, s, can ? 1 : .45);
-          if (!tch) text('' + (i + 1), bx + 3 * s, by + 2 * s + r.dy, COLR.dim);
-          const cw2 = 8 * s + 2 * s + tw('' + d.cost[0]), cx0 = bx + Math.round((bwid - cw2) / 2);
-          PX.icon(c, 'coin', cx0, by + bh - LH - 3 * s + r.dy, s, can ? 1 : .5); text('' + d.cost[0], cx0 + 10 * s, by + bh - LH - 3 * s + r.dy, can ? COLR.amber : COLR.red);
-          if (r.lit) lit = kind;
-        });
-        const ls = lines(lit || fk), ty = by + bh + 4 * s;
-        text(ls[0], px + mp, ty, lit || fk ? COLR.tx : COLR.dim); text(ls[1], px + mp, ty + LH + s, COLR.dim); if (ls[2]) text(ls[2], px + mp, ty + LH * 2 + s, COLR.dim);
-        if (tch && m.sel) { const can = G.gold >= TOWER[m.sel].cost[0]; text(can ? 'Tap again to build' : 'Not enough gold yet', px + mp, ty + LH * 3 + 2 * s, can ? COLR.amber : COLR.red); }
+        plate(px, py, wP, hP);
+        text('Piazzola Libera', px + mp, py + mp - s, COLR.amber);
+        const by = py + mp + LH + 3 * s, bwf = wP - mp * 2;
+        const r = button(px + mp, by, bwf, bh, 'barcher', can, () => doBuild(m.pad, 'archer'), { kind: 'archer' });
+        PX.icon(c, 'archer', px + mp + 6 * s, by + Math.round((bh - ih * s) / 2) + r.dy, s, can ? 1 : .45);
+        text(btnLbl, px + mp + 6 * s + iw * s + 5 * s, by + Math.round((bh - LH) / 2) + r.dy + s, can ? COLR.tx : COLR.red);
+        const ty = by + bh + 4 * s;
+        text(l1, px + mp, ty, COLR.dim);
+        text(l2, px + mp, ty + LH + s, COLR.ok);
       } else {
-        const t = m.tower, d = t.def, maxL = d.maxLvl ?? 2, maxed = t.lvl >= maxL, upc = maxed ? 0 : d.cost[t.lvl + 1], can = !maxed && G.gold >= upc && t.state === 'active', refund = Math.round(t.spent * .6), L1 = t.lvl + 1;
-        const isCat = t.kind === 'archer';
-        const tName = (d.names && d.names[t.lvl]) || d.name;
-        const ul = isCat ? (maxed ? 'Max DNA' : (t.lvl === 0 ? 'Fuoco ' + upc : '+Fuoco ' + upc)) : (maxed ? 'Max level' : 'Upgrade ' + upc);
-        const sl = m.sellArm ? 'Confirm +' + refund : 'Sell +' + refund, iw9 = 9 * s, bw3 = Math.max(tw(ul), tw(sl), tw('Confirm +' + refund)) + iw9 + 11 * s, bh = (tch ? 24 : 15) * s, by0 = Math.round((bh - LH) / 2);
-        const st = isCat
-          ? (t.lvl === 0 ? '0 DNA · Range ' + d.range[0].toFixed(1) + ' · Dmg ' + d.dmg[0] : t.lvl + '/4 DNA · Dmg ' + d.dmg[t.lvl] + ' · Splash ' + d.splash[t.lvl].toFixed(1))
-          : (t.kind === 'guard' ? d.n[t.lvl] + ' footmen · ' + d.hp[t.lvl] + ' health' : 'Range ' + d.range[t.lvl].toFixed(1) + ' · Damage ' + d.dmg[t.lvl]);
-        const nx = maxed
-          ? t.kills + ' kills'
-          : (isCat ? 'Next: ' + d.names[L1] + ' · Dmg ' + d.dmg[L1] + ' · Splash ' + d.splash[L1].toFixed(1) : (t.kind === 'guard' ? 'Next: ' + d.n[L1] + ' footmen · ' + d.hp[L1] + ' health' : 'Next: range ' + d.range[L1].toFixed(1) + ' · damage ' + d.dmg[L1]));
-        const pips = isCat ? maxL : 3;
-        const wP = Math.max(bw3 * 2 + 3 * s, tw(tName) + (pips * 6 + 8) * s, tw(st), tw(nx)) + mp * 2, hP = mp * 2 + LH * 3 + 6 * s + bh, [px, py] = place(wP, hP);
+        // Menu Mutazione DNA (0-4 slot): Fuoco (Terra) o Laser/Elettrico (Aria)
+        const t = m.tower, pr = t.prof, maxed = t.lvl >= 4, upc = maxed ? 0 : DNA_COSTS[t.lvl + 1];
+        const can = !maxed && G.gold >= upc && t.state === 'active', refund = Math.floor(t.spent * .5);
+        const nameCol = pr.model === 'elec' ? COLR.cold : (pr.model === 'fire' ? COLR.ember : COLR.amber);
+        const st = '[' + pr.tag + '] Dmg ' + pr.dmg + ' · R ' + pr.range.toFixed(1) + (pr.splash > 0 ? ' · Spl ' + pr.splash.toFixed(1) : '');
+
+        const hovElem = U.hotBtn && U.hotBtn.elem;
+        let nx = maxed ? ('Max 4/4 DNA · ' + t.kills + ' kills') : 'Scegli fiala: Fuoco (1) o Laser (2)';
+        let nxCol = maxed ? COLR.dim : COLR.ok;
+        if (!maxed && hovElem) {
+          const np = catProfile(t.dna.concat([hovElem]));
+          nx = 'Next: ' + np.name + ' [' + np.tag + '] Dmg ' + np.dmg;
+          nxCol = hovElem === 'elec' ? COLR.cold : COLR.ember;
+        }
+
+        const fLbl = 'Fuoco ' + upc, eLbl = 'Laser ' + upc, sLbl = m.sellArm ? 'Ok +' + refund : 'Vendi +' + refund;
+        const iw9 = 9 * s, bh = (tch ? 24 : 16) * s, by0 = Math.round((bh - LH) / 2);
+        const bwOne = Math.max(tw(fLbl), tw(eLbl), tw(sLbl), tw('Vendi +999')) + iw9 + 9 * s;
+        const nBtns = maxed ? 2 : 3;
+        const rowW = nBtns * bwOne + (nBtns - 1) * 3 * s;
+        const wP = Math.max(rowW, tw(pr.name) + 30 * s, tw(st), tw(nx), tw('Next: Cyborg Pirotecnico [ARIA] Dmg 175')) + mp * 2;
+        const hP = mp * 2 + LH * 3 + 6 * s + bh;
+        const [px, py] = place(wP, hP);
         U.menuRect = { x: px, y: py, w: wP, h: hP };
-        plate(px, py, wP, hP); text(tName, px + mp, py + mp - s, isCat && t.lvl > 0 ? COLR.ember : COLR.amber);
-        for (let i = 0; i < pips; i++) PX.icon(c, (isCat ? i < t.lvl : i <= t.lvl) ? 'star' : 'starEmpty', px + wP - mp - (pips - i) * 6 * s, py + mp, s);
-        text(st, px + mp, py + mp + LH + s, COLR.tx); text(nx, px + mp, py + mp + LH * 2 + 2 * s, maxed ? COLR.dim : COLR.ok);
-        const by = py + mp + LH * 3 + 6 * s, bwf = Math.floor((wP - mp * 2 - 3 * s) / 2);
-        let r = button(px + mp, by, bwf, bh, 'up', can, () => doUpgrade(t), null, false);
-        PX.icon(c, isCat && !maxed ? 'flame' : 'upgrade', px + mp + 4 * s, by + by0 + r.dy, s, can ? 1 : .4); text(ul, px + mp + 4 * s + iw9 + 3 * s, by + by0 + r.dy, can ? COLR.tx : (maxed ? COLR.dim : COLR.red));
-        r = button(px + mp + bwf + 3 * s, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, null, m.sellArm);
-        PX.icon(c, 'sell', px + mp + bwf + 7 * s, by + by0 + r.dy, s); text(sl, px + mp + bwf + 7 * s + iw9 + 3 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
+        plate(px, py, wP, hP);
+        text(pr.name, px + mp, py + mp - s, nameCol);
+
+        // 4 DNA slot pips colorati (Fuoco = rosso-arancio, Elettrico = azzurro, Vuoto = grigio)
+        for (let i = 0; i < 4; i++) {
+          const slIcon = t.dna[i] === 'fire' ? 'slotFire' : (t.dna[i] === 'elec' ? 'slotElec' : 'slotEmpty');
+          PX.icon(c, slIcon, px + wP - mp - (4 - i) * 6 * s, py + mp, s);
+        }
+        text(st, px + mp, py + mp + LH + s, COLR.tx);
+        text(nx, px + mp, py + mp + LH * 2 + 2 * s, nxCol);
+
+        const by = py + mp + LH * 3 + 6 * s, bwf = Math.floor((wP - mp * 2 - (nBtns - 1) * 3 * s) / nBtns);
+        if (!maxed) {
+          let r = button(px + mp, by, bwf, bh, 'mfire', can, () => doMutate(t, 'fire'), { elem: 'fire' });
+          PX.icon(c, 'flame', px + mp + 3 * s, by + by0 + r.dy, s, can ? 1 : .4);
+          text(fLbl, px + mp + 3 * s + iw9 + 2 * s, by + by0 + r.dy, can ? COLR.tx : COLR.red);
+
+          const x2 = px + mp + bwf + 3 * s;
+          r = button(x2, by, bwf, bh, 'melec', can, () => doMutate(t, 'elec'), { elem: 'elec' });
+          PX.icon(c, 'bolt', x2 + 3 * s, by + by0 + r.dy, s, can ? 1 : .4);
+          text(eLbl, x2 + 3 * s + iw9 + 2 * s, by + by0 + r.dy, can ? COLR.tx : COLR.red);
+
+          const x3 = x2 + bwf + 3 * s;
+          r = button(x3, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, { on: m.sellArm });
+          PX.icon(c, 'sell', x3 + 3 * s, by + by0 + r.dy, s);
+          text(sLbl, x3 + 3 * s + iw9 + 2 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
+        } else {
+          let r = button(px + mp, by, bwf, bh, 'max', false, () => {}, {});
+          PX.icon(c, 'upgrade', px + mp + 4 * s, by + by0 + r.dy, s, .35);
+          text('Max DNA', px + mp + 4 * s + iw9 + 3 * s, by + by0 + r.dy, COLR.dim);
+
+          const x2 = px + mp + bwf + 3 * s;
+          r = button(x2, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, { on: m.sellArm });
+          PX.icon(c, 'sell', x2 + 4 * s, by + by0 + r.dy, s);
+          text(sLbl, x2 + 4 * s + iw9 + 3 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
+        }
       }
       c.globalAlpha = 1;
     }
     if (hot !== U.hotBtn && hot) sfx('uiHover', CAM.x, CAM.z, .5);
     U.hotBtn = hot;
-    if (U.armed && mouse && G.phase === 'play') { const l = TOWER[U.armed].name + ': click a pad', w = tw(l) + pad * 2; const xx = clamp(U.mx + 10 * s, 2 * s, W - w - 2 * s), yy = clamp(U.my + 10 * s, 2 * s, H - LH - pad * 2); plate(xx, yy, w, LH + pad * 2 - s, { bd: COLR.bdHi }); text(l, xx + pad, yy + pad - s, COLR.tx); }
+    if (U.armed && mouse && G.phase === 'play') { const l = 'Gatto Base: click a pad', w = tw(l) + pad * 2; const xx = clamp(U.mx + 10 * s, 2 * s, W - w - 2 * s), yy = clamp(U.my + 10 * s, 2 * s, H - LH - pad * 2); plate(xx, yy, w, LH + pad * 2 - s, { bd: COLR.bdHi }); text(l, xx + pad, yy + pad - s, COLR.tx); }
     if (U.titleT < 7 && !U.menu) {
       const a = sat(Math.min((U.titleT - .4) * 1.5, (6.6 - U.titleT) * 1.2));
       if (a > 0) {
-        const sc = s * 2, t1 = 'Purr-craft', full = G.B.bio.name + ' · In pausa: piazza le torri e premi P.', t2 = tw(full) + pad * 4 > Wr - iL - 6 * s ? [G.B.bio.name, 'In pausa: piazza le torri', 'e premi P per iniziare.'] : [full]; if (G.best > 5) t2.push('Best run: wave ' + G.best);
+        const sc = s * 2, t1 = 'Purr-craft', full = G.B.bio.name + ' · In pausa: piazza i gatti e premi P.', t2 = tw(full) + pad * 4 > Wr - iL - 6 * s ? [G.B.bio.name, 'In pausa: piazza i gatti', 'e premi P per iniziare.'] : [full]; if (G.best > 5) t2.push('Best run: wave ' + G.best);
         let w = PX.measure(t1) * sc; for (const l of t2) w = Math.max(w, tw(l)); w += pad * 4; const h = PX.LINE * sc + LH * t2.length + pad * 2 + 2 * s, yy = Hb - h - 12 * s - zb;
         c.globalAlpha = a; plate(Math.round(W / 2 - w / 2), yy, w, h); PX.text(c, t1, W / 2, yy + pad, sc, '#ffd9a8', { align: 'c' }); t2.forEach((l, k) => text(l, W / 2, yy + pad + PX.LINE * sc + s + k * LH, k === 0 && t2.length > 1 ? COLR.tx : COLR.dim, { align: 'c' })); c.globalAlpha = 1;
       }

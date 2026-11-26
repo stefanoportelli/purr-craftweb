@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Confronto Proposte: Evoluzione Gatto Elettrico (Cyborg)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0d131c; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    #ui {
+      position: fixed; top: 14px; left: 14px; width: 318px; z-index: 20;
+      background: rgba(14, 21, 32, 0.93); border: 1px solid #2a3f59;
+      border-radius: 10px; padding: 13px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    }
+    h1 { font-size: 14.5px; margin-bottom: 7px; color: #ffe054; letter-spacing: 0.3px; }
+    .sub { font-size: 11.5px; color: #93a4b8; margin-bottom: 10px; line-height: 1.35; }
+    .row { margin-bottom: 9px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #9fb0c4; margin-bottom: 3px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #f5d13b; cursor: pointer; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px; }
+    .btns4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+    button {
+      background: #1f2c3d; color: #fff; border: 1px solid #334863;
+      border-radius: 6px; padding: 7px 6px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: #2b3d54; }
+    button.elec {
+      background: linear-gradient(135deg, #c99714, #e6b822);
+      border-color: #ffea80; color: #11161f;
+    }
+    button.elec:hover { background: linear-gradient(135deg, #e0aa1c, #ffcf33); }
+    button.active { background: #2563eb; border-color: #60a5fa; color: #fff; }
+    .hint { font-size: 10.5px; color: #6e8199; margin-top: 8px; border-top: 1px solid #243040; padding-top: 7px; line-height: 1.4; }
+
+    #labels { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+    .tag {
+      position: absolute; transform: translate(-50%, -100%);
+      background: rgba(12, 18, 28, 0.9); border: 1px solid #3c4d63;
+      border-radius: 8px; padding: 5px 9px; text-align: center;
+      white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    }
+    .tag.base { border-color: #e8893c; }
+    .tag.elec { border-color: #f5d13b; }
+    .tag .t { font-size: 12px; font-weight: 700; color: #fff; }
+    .tag.base .t { color: #ffbe78; }
+    .tag.elec .t { color: #ffe566; }
+    .tag .d { font-size: 10.5px; color: #9fb0c4; margin-top: 1px; }
+
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content;
+      background: #1c2430; border: 1px solid #e5534b; border-radius: 10px; padding: 20px; z-index: 30;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0d1117; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>⚡ Confronto Evoluzione: Gatto Elettrico</h1>
+    <div class="sub">Sopra: <b>Gatto Base (0 DNA)</b> di riferimento.<br>Sotto: <b>3 proposte</b> contraeree (Solo ARIA → <i>Gatto Cyborg</i>).</div>
+
+    <div class="row">
+      <label>Stadio Evoluzione (Proposte): <span id="lblLvl">1 DNA (Normale)</span></label>
+      <input id="rngLvl" type="range" min="1" max="4" step="1" value="1" />
+    </div>
+
+    <div class="btns">
+      <button id="btnAttack" class="elec">⚡ Spara Laser [Spazio]</button>
+      <button id="btnAutoFire" class="active">Fuoco Auto: ON</button>
+      <button id="btnTurn" class="active">Ruota Base: ON</button>
+      <button id="btnReset">Reset Camera</button>
+    </div>
+
+    <div class="row" style="margin-bottom:4px;">
+      <label>Inquadra:</label>
+    </div>
+    <div class="btns4">
+      <button id="camAll" class="active">Tutti</button>
+      <button id="camA">Prop. A</button>
+      <button id="camB">Prop. B</button>
+      <button id="camC">Prop. C</button>
+    </div>
+
+    <div class="hint">
+      <b>Mouse:</b> Trascina SX ruota • Rotella zoom • Trascina DX sposta.<br>
+      I <b>Tentacoli Alati</b> orbitano sopra le torrette per testare la mira contraerea e i raggi laser ad alta cadenza.
+    </div>
+  </div>
+
+  <div id="labels"></div>
+
+  <div id="err">
+    <strong style="color:#ff7b72;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startShowroom(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startShowroom() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startShowroom() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+
+  const COL = {
+    iron: C(0x4b5563), steel: C(0x8896a6), stoneD: C(0x2d3540),
+    black: [0.05, 0.06, 0.08], gold: C(0xf5c242)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d131c);
+  scene.fog = new THREE.FogExp2(0x0d131c, 0.022);
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 120);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  const camGoal = { theta: 0.0, phi: 1.0, dist: 11.8, tx: 0, ty: 1.15, tz: 0.85 };
+  const camCur  = { ...camGoal };
+  function applyCamera() {
+    const h = camCur.dist * Math.sin(camCur.phi);
+    camera.position.set(
+      camCur.tx + h * Math.sin(camCur.theta),
+      camCur.ty + camCur.dist * Math.cos(camCur.phi),
+      camCur.tz + h * Math.cos(camCur.theta)
+    );
+    camera.lookAt(camCur.tx, camCur.ty, camCur.tz);
+  }
+  applyCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camGoal.theta -= dx * 0.008;
+      camGoal.phi = clamp(camGoal.phi - dy * 0.008, 0.14, HPI - 0.06);
+    } else {
+      const pan = camGoal.dist * 0.0018;
+      camGoal.tx -= (Math.cos(camGoal.theta) * dx + Math.sin(camGoal.theta) * dy) * pan;
+      camGoal.tz -= (-Math.sin(camGoal.theta) * dx + Math.cos(camGoal.theta) * dy) * pan;
+    }
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camGoal.dist = clamp(camGoal.dist * (e.deltaY > 0 ? 1.1 : 0.91), 3.0, 22);
+  }, { passive: false });
+
+  // Luci
+  scene.add(new THREE.HemisphereLight(0xb2d8ff, 0x1a2230, 1.15));
+  const dirLight = new THREE.DirectionalLight(0xfff6e5, 1.3);
+  dirLight.position.set(5, 13, 8);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const elecFill = new THREE.PointLight(0x52d6ff, 1.35, 18);
+  elecFill.position.set(0, 3.2, 4.0);
+  scene.add(elecFill);
+
+  // Pavimento
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 28), new THREE.MeshStandardMaterial({ color: 0x1a222d, roughness: 0.75 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+    const grid = new THREE.GridHelper(34, 34, 0x2f435c, 0x161e28);
+    grid.position.y = 0.005;
+    scene.add(grid);
+  }
+
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const boost = 1 + (o.emis || 0) * 1.45;
+      this.items.push({ g, c: [Math.min(1, c[0] * boost), Math.min(1, c[1] * boost), Math.min(1, c[2] * boost)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 8), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 8, o.h || 6), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    tri(a, b, cPt, col) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...cPt], 3));
+      this._push(g, col, {});
+    }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    hose(pts, r, colTube, colRing, colGlow = null) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        this.seg(a, b, r, r, colTube, { n: 7 });
+        const mx = (a[0] + b[0]) * .5, my = (a[1] + b[1]) * .5, mz = (a[2] + b[2]) * .5;
+        const useGlow = colGlow && (i % 2 === 1);
+        this.sph(r * 1.24, mx, my, mz, useGlow ? colGlow : colRing, { w: 6, h: 5, emis: useGlow ? .9 : 0 });
+        if (i > 0) this.sph(r * 1.15, a[0], a[1], a[2], colTube, { w: 6, h: 5 });
+      }
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    build() {
+      let total = 0;
+      for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) {
+          col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2];
+        }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.18 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S);
+      this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1));
+      m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat, flash = 0) {
+      if (this.n >= this.cap) return;
+      const i = this.n++;
+      this.mesh.setMatrixAt(i, mat);
+      const col = new THREE.Color(1, 1, 1);
+      if (flash > 0) col.setRGB(1 + flash, 1 + flash, 1 + flash);
+      this.mesh.setColorAt(i, col);
+    }
+    end() {
+      this.mesh.count = this.n;
+      this.mesh.visible = this.n > 0;
+      if (this.n) {
+        this.mesh.instanceMatrix.needsUpdate = true;
+        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+      }
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  const SPOTS = [
+    { id: 'base', x:  0.0, y: 0.42, z: -2.0, title: 'GATTO BASE (0 DNA)', desc: 'Gatto Graffiatore — Riferimento', kind: 'base' },
+    { id: 'A',    x: -3.6, y: 0.34, z:  2.2, title: 'PROPOSTA A — Tesla-Pack', desc: 'Stile Ghostbusters: Bobina + Cavo HV + Lancia Laser', kind: 'elec' },
+    { id: 'B',    x:  0.0, y: 0.34, z:  2.2, title: 'PROPOSTA B — Cyber-Scout', desc: 'Visore neon + Cannone laser su spalla (Cyborg)', kind: 'elec' },
+    { id: 'C',    x:  3.6, y: 0.34, z:  2.2, title: 'PROPOSTA C — Radar Contraereo', desc: 'Casco antenna + Parabola + Anelli giroscopici', kind: 'elec' },
+  ];
+
+  function buildPedestals() {
+    for (const sp of SPOTS) {
+      const S = new Soup();
+      const H = sp.y, R = sp.kind === 'base' ? 1.05 : 1.15;
+      const ringCol = sp.kind === 'base' ? C(0xe8893c) : C(0xf5d13b);
+      S.cyl(R + .14, .14, 0, .07, 0, COL.stoneD, { n: 14 });
+      S.cyl(R, H, 0, H / 2, 0, COL.iron, { n: 14, rt: .93 });
+      S.add(gTorus(20, .045, 6), { s: R * .92, p: [0, H + .01, 0], r: [HPI, 0, 0], c: ringCol, emis: .6 });
+      const mesh = new THREE.Mesh(S.build(), MAT_INST);
+      mesh.position.set(sp.x, 0, sp.z);
+      mesh.castShadow = mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xf5d13b, transparent: true, opacity: 0.45 });
+    const addBar = (x1, z1, x2, z2) => {
+      const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, len), lineMat);
+      m.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+      m.rotation.y = Math.atan2(dx, dz);
+      scene.add(m);
+    };
+    addBar(0, -0.85, 0, 0.2);
+    addBar(-3.6, 0.2, 3.6, 0.2);
+    addBar(-3.6, 0.2, -3.6, 0.95);
+    addBar(0, 0.2, 0, 0.95);
+    addBar(3.6, 0.2, 3.6, 0.95);
+  }
+
+  const labelsRoot = document.getElementById('labels');
+  const labelEls = SPOTS.map(sp => {
+    const el = document.createElement('div');
+    el.className = 'tag ' + sp.kind;
+    el.innerHTML = `<div class="t">${sp.title}</div><div class="d">${sp.desc}</div>`;
+    labelsRoot.appendChild(el);
+    return { sp, el };
+  });
+
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    // 0. GATTO BASE
+    KIT.base = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .8, -.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+    };
+
+    const yFur = C(0xf0c23c), yFurD = C(0xb8861e), steelD = C(0x303b4a), chrome = C(0xb9c7d9), copper = C(0xc87432);
+    const neonY = C(0xfff059), neonC = C(0x3df5ff), hoseDark = C(0x1b222c);
+
+    // PROPOSTA A — TESLA-PACK (Coerente con Gatto Fuoco Ghostbusters: zaino Tesla + cavo alta tensione + lancia laser)
+    KIT.propA = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, yFur, { sc: [1.06, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, yFur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, yFurD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+          S.seg([s * .16, .72, -.22], [s * .18, .72, .16], .042, .042, steelD, { n: 5 });
+          S.seg([s * .18, .72, .16], [s * .14, .44, .27], .038, .038, steelD, { n: 5 });
+        }
+        // Batteria centrale sul petto con indicatore ciano
+        S.box(.26, .09, .06, 0, .56, .27, steelD);
+        S.box(.14, .045, .07, 0, .56, .28, neonC, { emis: .95 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, yFur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        // Visore mono-fascia ciano sulla fronte (alzato/tecnico) + cuffie isolanti
+        S.box(.42, .11, .10, 0, .42, .31, steelD);
+        S.box(.34, .06, .11, 0, .42, .32, neonC, { emis: .9 });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.14, .31, s * .21, .56, 0, yFur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, neonY, { n: 4, r: [0, 0, s * -.24], emis: .55 });
+          S.sph(.072, s * .135, .28, .33, C(0x1f82c9), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.cyl(.11, .08, s * .37, .28, .02, steelD, { n: 8, r: [0, 0, HPI] }); // cuffie laterali
+          S.cyl(.06, .09, s * .38, .28, .02, neonY, { n: 8, r: [0, 0, HPI], emis: .7 });
+        }
+      }, 2),
+      pawFree: new PartBatch(S => {
+        S.cyl(.092, .36, 0, -.14, .08, yFur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.112, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 2, { shadow: false }),
+      pawLaser: new PartBatch(S => {
+        S.cyl(.092, .34, 0, -.13, .06, yFur, { n: 8, r: [.42, 0, 0] });
+        S.sph(.108, 0, -.25, .15, steelD, { sc: [1.1, .85, 1.1], w: 7, h: 5 });
+        // Lancia Laser a Bobina di Rame
+        S.cyl(.065, .18, 0, -.25, .08, copper, { n: 8, r: [HPI, 0, 0] });
+        S.cyl(.075, .42, 0, -.25, .30, steelD, { n: 8, r: [HPI, 0, 0] });
+        for (const z of [.22, .32, .42]) S.add(gTorus(10, .2, 5), { s: .09, p: [0, -.25, z], c: copper });
+        S.sph(.075, 0, -.25, .54, neonC, { w: 6, h: 5, emis: 1.0 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        // Coda a zig-zag a forma di fulmine!
+        S.seg([0, 0, 0], [0, .24, -.22], .065, .055, yFur, { n: 5 });
+        S.seg([0, .24, -.22], [0, .46, -.10], .055, .048, neonY, { n: 5, emis: .45 });
+        S.seg([0, .46, -.10], [0, .78, -.32], .048, .016, neonY, { n: 4, emis: .85 });
+      }, 2, { shadow: false }),
+      pack1: new PartBatch(S => {
+        S.box(.36, .48, .10, 0, .52, -.26, steelD);
+        // Bobina Tesla centrale con anelli di rame e sfera plasma in cima
+        S.cyl(.13, .48, 0, .58, -.40, copper, { n: 10 });
+        for (const y of [.42, .54, .66, .78]) S.add(gTorus(12, .16, 5), { s: .16, p: [0, y, -.40], r: [HPI, 0, 0], c: chrome });
+        S.sph(.12, 0, .92, -.40, neonC, { w: 8, h: 6, emis: .95 });
+        S.cyl(.055, .12, .16, .35, -.40, copper, { n: 8, r: [0, 0, HPI] });
+        S.hose([[.20,.35,-.40],[.38,.31,-.34],[.48,.26,-.18],[.47,.24,.02],[.36,.26,.16],[.21,.29,.22]], .04, hoseDark, neonY, neonC);
+      }, 2),
+      pack2: new PartBatch(S => {
+        S.box(.56, .54, .10, 0, .54, -.26, steelD);
+        S.sph(.10, 0, .54, -.42, neonC, { w: 7, h: 5, emis: 1.0 });
+        for (const s of [-1, 1]) {
+          S.cyl(.12, .54, s * .21, .60, -.40, copper, { n: 10 });
+          for (const y of [.44, .58, .72, .84]) S.add(gTorus(12, .16, 5), { s: .15, p: [s * .21, y, -.40], r: [HPI, 0, 0], c: chrome });
+          S.sph(.125, s * .21, .98, -.40, neonC, { w: 8, h: 6, emis: 1.0 });
+          S.cyl(.055, .12, s * .34, .34, -.40, copper, { n: 8, r: [0, 0, HPI] });
+          S.hose([[s*.37,.34,-.40],[s*.50,.29,-.30],[s*.54,.25,-.12],[s*.48,.24,.06],[s*.36,.27,.17],[s*.21,.29,.22]], .044, hoseDark, neonY, neonC);
+        }
+      }, 2),
+      arc: new PartBatch(S => {
+        S.seg([-.21, .98, -.40], [0, 1.06, -.40], .028, .028, neonY, { n: 4, emis: 1.0 });
+        S.seg([0, 1.06, -.40], [.21, .98, -.40], .028, .028, neonC, { n: 4, emis: 1.0 });
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA B — CYBER-SCOUT (Gatto Cyborg puro: armatura cromata + visore laser sugli occhi + cannoni su spalla)
+    const cybDark = C(0x242c38), cybPlate = C(0x8c9eb5);
+    KIT.propB = {
+      body: new PartBatch(S => {
+        S.sph(.39, 0, .29, -.03, cybPlate, { sc: [1.08, .94, 1.12], w: 10, h: 7 });
+        S.cyl(.27, .46, 0, .54, .02, cybDark, { n: 10, rt: 1.25 });
+        // Reattore Arc sul petto
+        S.cyl(.15, .08, 0, .50, .26, cybPlate, { n: 10, r: [HPI, 0, 0] });
+        S.cyl(.10, .09, 0, .50, .27, neonC, { n: 10, r: [HPI, 0, 0], emis: 1.0 });
+        for (const s of [-1, 1]) {
+          S.sph(.20, s * .31, .18, -.08, cybDark, { sc: [.88, .85, 1.25], w: 8, h: 6 });
+          S.box(.18, .10, .22, s * .32, .07, .12, cybPlate);
+        }
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, cybPlate, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        // Visore Cybernetico sugli occhi (stile Cyclops giallo/ciano)
+        S.box(.48, .15, .14, 0, .28, .31, cybDark);
+        S.box(.42, .085, .15, 0, .28, .33, neonY, { emis: 1.0 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .20, .39, neonC, { n: 4, r: [HPI, 0, 0], emis: .8 });
+        for (const s of [-1, 1]) {
+          // Orecchie cyber-antenna
+          S.cone(.14, .32, s * .22, .56, 0, cybDark, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.08, .22, s * .22, .54, .03, neonY, { n: 4, r: [0, 0, s * -.24], emis: .85 });
+          S.seg([s * .27, .64, -.02], [s * .33, .88, -.04], .02, .01, chrome, { n: 4 });
+          S.sph(.038, s * .33, .90, -.04, neonC, { w: 6, h: 5, emis: 1.0 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .36, 0, -.14, .08, cybDark, { n: 8, r: [.45, 0, 0] });
+        S.box(.16, .14, .22, 0, -.28, .18, cybPlate);
+        S.box(.10, .06, .06, 0, -.28, .30, neonC, { emis: .9 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .26, -.22], .055, .048, cybDark, { n: 6 });
+        S.seg([0, .26, -.22], [0, .58, -.16], .048, .038, cybPlate, { n: 6 });
+        S.seg([0, .58, -.16], [0, .84, -.28], .038, .022, cybDark, { n: 5 });
+        S.sph(.07, 0, .86, -.30, neonY, { w: 6, h: 5, emis: 1.0 });
+      }, 2, { shadow: false }),
+      shoulderGun: new PartBatch(S => {
+        // Cannone railgun montato sulla spalla (punta verso l'alto!)
+        S.box(.18, .18, .32, 0, 0, 0, cybDark);
+        S.cyl(.065, .56, 0, .02, .32, chrome, { n: 8, r: [HPI, 0, 0] });
+        S.box(.04, .04, .48, 0, .09, .30, neonY, { emis: .95 });
+        S.sph(.07, 0, .02, .62, neonC, { w: 6, h: 5, emis: 1.0 });
+      }, 4),
+      wings: new PartBatch(S => {
+        // Alette stabilizzatrici energetiche sul dorso (Lv 4)
+        for (const s of [-1, 1]) {
+          S.box(.52, .05, .24, s * .42, .66, -.28, cybDark, { r: [.2, 0, s * .35] });
+          S.box(.44, .03, .12, s * .44, .68, -.32, neonC, { r: [.2, 0, s * .35], emis: .95 });
+        }
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA C — RADAR CONTRAEREO (Gatto giallo con casco-parabola + anelli giroscopici elettrici)
+    KIT.propC = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, yFur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, yFur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, yFurD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(14, .16, 5), { s: .29, p: [0, .74, .04], r: [HPI, 0, 0], c: steelD });
+        S.sph(.075, 0, .72, .32, neonY, { w: 6, h: 4, emis: 1.0 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, yFur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        // Cupola radar sulla testa
+        S.cyl(.22, .10, 0, .60, 0, steelD, { n: 10, rt: .8 });
+        S.seg([0, .65, 0], [0, .95, 0], .03, .015, chrome, { n: 6 });
+        S.sph(.08, 0, .98, 0, neonY, { w: 7, h: 5, emis: 1.0 });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.14, .31, s * .21, .56, 0, yFur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, neonC, { n: 4, r: [0, 0, s * -.24], emis: .7 });
+          S.sph(.072, s * .135, .28, .33, neonC, { w: 7, h: 5, emis: .85 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .36, 0, -.14, .08, yFur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .065, .055, yFur, { n: 5 });
+        S.seg([0, .24, -.22], [0, .54, -.12], .055, .045, neonY, { n: 5, emis: .5 });
+        S.seg([0, .54, -.12], [0, .82, -.30], .045, .02, neonC, { n: 5, emis: .8 });
+      }, 2, { shadow: false }),
+      dish: new PartBatch(S => {
+        // Parabola contraerea orientabile sul dorso
+        S.cyl(.32, .10, 0, 0, 0, chrome, { n: 12, rt: .4, r: [HPI, 0, 0] });
+        S.add(gTorus(14, .1, 5), { s: .32, p: [0, 0, .05], c: steelD });
+        S.seg([0, 0, .02], [0, 0, .34], .028, .016, steelD, { n: 5 });
+        S.sph(.075, 0, 0, .36, neonC, { w: 6, h: 5, emis: 1.0 });
+      }, 2),
+      gyro: new PartBatch(S => {
+        // Anelli giroscopici elettrici rotanti (Lv 2+)
+        S.add(gTorus(20, .045, 5), { s: .72, p: [0, .7, 0], r: [HPI, 0, 0], c: neonY, emis: .9 });
+        S.add(gTorus(20, .035, 5), { s: .84, p: [0, .7, 0], r: [HPI + .45, .3, 0], c: neonC, emis: .95 });
+      }, 2, { shadow: false }),
+    };
+
+    // Tentacolo Alato bersaglio in volo
+    KIT.tentacolo = {
+      body: new PartBatch(S => {
+        S.sph(.17, 0, .03, 0, C(0x482242), { sc: [.9, 1.05, 1.25], w: 7, h: 5 });
+        S.sph(.075, 0, .05, .18, C(0xd4ff42), { w: 6, h: 5, emis: .45 });
+        S.box(.035, .1, .02, 0, .05, .25, COL.black);
+      }, 8),
+      wing: new PartBatch(S => {
+        const w1 = C(0x5a2850), w2 = C(0x31152d);
+        const pts = [[0, 0, .12], [.24, .05, .18], [.58, .03, .08], [.5, 0, -.08], [.34, 0, -.03], [.24, 0, -.18], [.12, 0, -.08], [0, 0, -.15]];
+        for (let i = 1; i < pts.length - 1; i++) {
+          S.tri(pts[0], pts[i + 1], pts[i], i & 1 ? w1 : w2);
+          S.tri(pts[0], pts[i], pts[i + 1], i & 1 ? w1 : w2);
+        }
+      }, 16, { shadow: false }),
+    };
+  }
+
+  // Raggi laser visivi (istantanei / hitscan da GDD 3.0)
+  const beams = [];
+  function spawnLaser(p1, p2, colHex = 0x54f4ff) {
+    const dir = p2.clone().sub(p1), len = dir.length();
+    const m = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.032, 0.032, len, 6),
+      new THREE.MeshBasicMaterial({ color: colHex, transparent: true, opacity: 1 })
+    );
+    m.position.copy(p1).add(p2).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    scene.add(m);
+    beams.push({ mesh: m, life: 0.16, max: 0.16 });
+  }
+
+  function rigModel(K, kind, x, y, z, yaw, pitchAim, scale, atk, lvl) {
+    const t = SH.uTime.value * 3.6;
+    const recoil = atk > 0 ? Math.sin(atk * PI) : 0;
+    const sq = 1 + Math.sin(t) * .025 - recoil * .06, sx = 1 / Math.sqrt(sq);
+
+    const M0 = xf(_M[0], null, x, y, z, -recoil * .12, yaw, 0, scale * sx, scale * sq, scale * sx);
+    K.body.put(M0);
+    const MHead = xf(_M[1], M0, 0, .78, .05, kind === 'base' ? 0 : pitchAim * 0.5, 0, Math.sin(t * .7) * .05);
+    K.head.put(MHead);
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.8) * .45, Math.cos(t * 1.8) * .12));
+
+    if (kind === 'base') {
+      for (const s of [-1, 1]) K.paw.put(xf(_M[2 + (s > 0 ? 1 : 0)], M0, s * .18, .54, .18, 0, 0, 0));
+    } else if (kind === 'A') {
+      const dual = lvl >= 3;
+      K.pawLaser.put(xf(_M[2], M0, .20, .54, .18 - recoil * .06, pitchAim - recoil * .12, 0, 0));
+      if (dual) {
+        K.pawLaser.put(xf(_M[3], M0, -.20, .54, .18 - recoil * .06, pitchAim - recoil * .12, 0, 0));
+        K.pack2.put(M0);
+        if (lvl >= 4) K.arc.put(xf(_M[5], M0, 0, 0, 0, 0, 0, Math.sin(t * 12) * .08));
+      } else {
+        K.pawFree.put(xf(_M[3], M0, -.19, .54, .18, -.2, .15, -.12));
+        K.pack1.put(M0);
+      }
+    } else if (kind === 'B') {
+      for (const s of [-1, 1]) K.paw.put(xf(_M[2 + (s > 0 ? 1 : 0)], M0, s * .20, .54, .18, -.25, 0, 0));
+      const dual = lvl >= 3;
+      K.shoulderGun.put(xf(_M[5], M0, .34, .82, -.04 - recoil * .08, pitchAim, 0, 0));
+      if (dual) K.shoulderGun.put(xf(_M[6], M0, -.34, .82, -.04 - recoil * .08, pitchAim, 0, 0));
+      if (lvl >= 4) K.wings.put(M0);
+    } else if (kind === 'C') {
+      for (const s of [-1, 1]) K.paw.put(xf(_M[2 + (s > 0 ? 1 : 0)], M0, s * .19, .54, .18, -.15, 0, 0));
+      K.dish.put(xf(_M[5], M0, 0, .86, -.32, pitchAim, 0, 0, 1 + lvl * .08, 1 + lvl * .08, 1 + lvl * .08));
+      if (lvl >= 2) K.gyro.put(xf(_M[6], M0, 0, 0, 0, 0, t * (1.2 + lvl * .4), 0, .85 + lvl * .08, .85 + lvl * .08, .85 + lvl * .08));
+    }
+  }
+
+  initModels();
+  buildPedestals();
+
+  const LVL_NAMES = ['', '1 DNA (Normale)', '2 DNA (Paffuto)', '3 DNA (Grande)', '4 DNA (Gatto Cyborg)'];
+  const SCALES = [0.86, 1.00, 1.15, 1.32, 1.50];
+  let dnaLvl = 1, turnBase = true, autoFire = true, spinAngle = 0, atkTimer = 0, fireCd = 0.4;
+
+  const flyer = { x: 0, y: 3.4, z: 2.2, flash: 0 };
+
+  function fireLasers() {
+    atkTimer = 1.0;
+    flyer.flash = 1.0;
+    const tgt = new THREE.Vector3(flyer.x, flyer.y, flyer.z);
+    for (const sp of SPOTS) {
+      if (sp.kind !== 'elec') continue;
+      const sc = SCALES[dnaLvl];
+      const yaw = Math.atan2(flyer.x - sp.x, flyer.z - sp.z);
+      const cs = Math.cos(yaw), sn = Math.sin(yaw);
+      if (sp.id === 'A') {
+        const sides = dnaLvl >= 3 ? [-1, 1] : [1];
+        for (const s of sides) {
+          const lx = s * .20 * sc, lz = .68 * sc;
+          spawnLaser(new THREE.Vector3(sp.x + lx * cs + lz * sn, sp.y + .65 * sc, sp.z - lx * sn + lz * cs), tgt, 0x4df5ff);
+        }
+      } else if (sp.id === 'B') {
+        const sides = dnaLvl >= 3 ? [-1, 1] : [1];
+        for (const s of sides) {
+          const lx = s * .34 * sc, lz = .48 * sc;
+          spawnLaser(new THREE.Vector3(sp.x + lx * cs + lz * sn, sp.y + 1.02 * sc, sp.z - lx * sn + lz * cs), tgt, 0xffe84d);
+        }
+      } else {
+        spawnLaser(new THREE.Vector3(sp.x, sp.y + 1.15 * sc, sp.z), tgt, 0x64f0ff);
+      }
+    }
+  }
+
+  document.getElementById('rngLvl').oninput = e => {
+    dnaLvl = +e.target.value;
+    document.getElementById('lblLvl').textContent = LVL_NAMES[dnaLvl];
+  };
+  document.getElementById('btnAttack').onclick = fireLasers;
+  const btnAuto = document.getElementById('btnAutoFire');
+  btnAuto.onclick = () => {
+    autoFire = !autoFire;
+    btnAuto.textContent = 'Fuoco Auto: ' + (autoFire ? 'ON' : 'OFF');
+    btnAuto.classList.toggle('active', autoFire);
+  };
+  const btnTurn = document.getElementById('btnTurn');
+  btnTurn.onclick = () => {
+    turnBase = !turnBase;
+    btnTurn.textContent = 'Ruota Base: ' + (turnBase ? 'ON' : 'OFF');
+    btnTurn.classList.toggle('active', turnBase);
+  };
+
+  const camBtns = ['camAll', 'camA', 'camB', 'camC'];
+  function setCam(id, tx, ty, tz, dist, phi, theta) {
+    camGoal.tx = tx; camGoal.ty = ty; camGoal.tz = tz;
+    camGoal.dist = dist; camGoal.phi = phi; camGoal.theta = theta;
+    for (const b of camBtns) document.getElementById(b).classList.toggle('active', b === id);
+  }
+  document.getElementById('camAll').onclick   = () => setCam('camAll', 0, 1.15, 0.85, 11.8, 1.0, 0.0);
+  document.getElementById('btnReset').onclick = () => setCam('camAll', 0, 1.15, 0.85, 11.8, 1.0, 0.0);
+  document.getElementById('camA').onclick     = () => setCam('camA', -3.6, 1.0, 2.2, 4.6, 1.05, 0.45);
+  document.getElementById('camB').onclick     = () => setCam('camB',  0.0, 1.0, 2.2, 4.6, 1.05, 0.45);
+  document.getElementById('camC').onclick     = () => setCam('camC',  3.6, 1.0, 2.2, 4.6, 1.05, 0.45);
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); fireLasers(); } });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  const projV = new THREE.Vector3();
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    SH.uTime.value += dt;
+
+    for (const k of ['theta', 'phi', 'dist', 'tx', 'ty', 'tz']) camCur[k] = damp(camCur[k], camGoal[k], 8, dt);
+    applyCamera();
+
+    if (turnBase) spinAngle += dt * 0.55;
+    atkTimer = Math.max(0, atkTimer - dt * 5.0);
+
+    // Tentacolo Alato in orbita sopra le 3 proposte
+    const fa = SH.uTime.value * 0.85;
+    flyer.x = Math.cos(fa) * 4.2;
+    flyer.z = 2.2 + Math.sin(fa * 2) * 1.4;
+    flyer.y = 3.2 + Math.sin(fa * 3) * 0.25;
+    flyer.flash = Math.max(0, flyer.flash - dt * 6);
+
+    if (autoFire) {
+      fireCd -= dt;
+      if (fireCd <= 0) {
+        const rates = [0, 1.5, 2.0, 2.5, 3.5];
+        fireCd = 1 / rates[dnaLvl];
+        fireLasers();
+      }
+    }
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    // Disegna Tentacolo Alato
+    const fYaw = Math.atan2(-Math.sin(fa) * 4.2, Math.cos(fa * 2) * 2.8);
+    const MF = xf(_M[10], null, flyer.x, flyer.y, flyer.z, -.15, fYaw, 0, 1.25, 1.25, 1.25);
+    KIT.tentacolo.body.put(MF, flyer.flash);
+    const flap = Math.sin(SH.uTime.value * 13);
+    KIT.tentacolo.wing.put(xf(_M[11], MF, .1, .04, 0, 0, 0, flap * .85 + .15), flyer.flash);
+    KIT.tentacolo.wing.put(xf(_M[12], MF, -.1, .04, 0, 0, 0, -(flap * .85 + .15), -1, 1, 1), flyer.flash);
+
+    // Disegna Gatto Base + 3 Proposte che tracciano il bersaglio aereo
+    rigModel(KIT.base, 'base', SPOTS[0].x, SPOTS[0].y + 0.04, SPOTS[0].z, turnBase ? spinAngle : 0, 0, SCALES[0], 0, 0);
+    for (const [K, sp] of [[KIT.propA, SPOTS[1]], [KIT.propB, SPOTS[2]], [KIT.propC, SPOTS[3]]]) {
+      const dx = flyer.x - sp.x, dy = flyer.y - (sp.y + 0.9), dz = flyer.z - sp.z;
+      const yaw = Math.atan2(dx, dz);
+      const pitch = -Math.atan2(dy, Math.hypot(dx, dz));
+      rigModel(K, sp.id, sp.x, sp.y + 0.04, sp.z, yaw, pitch, SCALES[dnaLvl], atkTimer, dnaLvl);
+    }
+
+    for (let i = beams.length - 1; i >= 0; i--) {
+      const b = beams[i];
+      b.life -= dt;
+      if (b.life <= 0) { scene.remove(b.mesh); b.mesh.geometry.dispose(); b.mesh.material.dispose(); beams.splice(i, 1); }
+      else b.mesh.material.opacity = b.life / b.max;
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+
+    for (const { sp, el } of labelEls) {
+      const sc = sp.kind === 'base' ? SCALES[0] : SCALES[dnaLvl];
+      projV.set(sp.x, sp.y + 1.65 * sc + 0.35, sp.z).project(camera);
+      if (projV.z > 1) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + 'px';
+      el.style.top  = ((-projV.y * 0.5 + 0.5) * innerHeight) + 'px';
+    }
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>

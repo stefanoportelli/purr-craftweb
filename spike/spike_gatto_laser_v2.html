@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Spike Gatto Laser (Proposta A Rifinita + Aura Lv 4)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0a101a; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    #ui {
+      position: fixed; top: 14px; left: 14px; width: 324px; z-index: 20;
+      background: rgba(11, 18, 30, 0.94); border: 1px solid #244061;
+      border-radius: 10px; padding: 14px; backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+    h1 { font-size: 14.5px; margin-bottom: 6px; color: #5eead4; letter-spacing: 0.3px; }
+    .sub { font-size: 11.5px; color: #94a3b8; margin-bottom: 10px; line-height: 1.38; }
+    .slots-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #080d16; border: 1px solid #22354f; border-radius: 6px;
+      padding: 7px 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .slots { display: flex; gap: 5px; }
+    .slot {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 1px solid #475569; background: #162032; transition: 0.2s;
+    }
+    .slot.elec {
+      background: radial-gradient(circle at 35% 35%, #ffffff, #38bdf8 65%, #0369a1);
+      border-color: #7dd3fc; box-shadow: 0 0 8px rgba(56, 189, 248, 0.85);
+    }
+    .row { margin-bottom: 10px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #38bdf8; cursor: pointer; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    button {
+      background: #1e293b; color: #fff; border: 1px solid #334155;
+      border-radius: 6px; padding: 7px 8px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.12s;
+    }
+    button:hover { background: #334155; }
+    button.elec {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      border-color: #7dd3fc; color: #06131f; grid-column: span 2; font-size: 12.5px; padding: 8px;
+    }
+    button.elec:hover { background: linear-gradient(135deg, #0ea5e9, #7dd3fc); }
+    button.active { background: #2563eb; border-color: #60a5fa; color: #fff; }
+    .hint { font-size: 10.5px; color: #64748b; margin-top: 8px; border-top: 1px solid #1e293b; padding-top: 7px; line-height: 1.45; }
+
+    #labels { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+    .tag {
+      position: absolute; transform: translate(-50%, -100%);
+      background: rgba(8, 13, 23, 0.9); border: 1px solid #2b4566;
+      border-radius: 8px; padding: 5px 10px; text-align: center; white-space: nowrap;
+    }
+    .tag.base { border-color: #f97316; }
+    .tag.elec { border-color: #38bdf8; }
+    .tag .t { font-size: 12px; font-weight: 700; }
+    .tag.base .t { color: #fdba74; }
+    .tag.elec .t { color: #7dd3fc; }
+    .tag .d { font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 440px; height: fit-content;
+      background: #1c2430; border: 1px solid #ef4444; border-radius: 10px; padding: 20px; z-index: 30;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>⚡ Proposta A Rifinita — Gatto Laser</h1>
+    <div class="sub">Monocolo olografico traslucido con <b>cornice curva + reticolo</b> e <b>aura azzurrina al Lv 4 (Gatto Cyborg)</b>.</div>
+
+    <div class="slots-bar">
+      <strong id="lblForm" style="color:#7dd3fc;">4 DNA — Gatto Cyborg</strong>
+      <div class="slots" id="dnaSlots">
+        <div class="slot elec"></div><div class="slot elec"></div><div class="slot elec"></div><div class="slot elec"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Evoluzione DNA: <span id="lblLvl">4 DNA (Max + Aura Azzurra)</span></label>
+      <input id="rngLvl" type="range" min="1" max="4" step="1" value="4" />
+    </div>
+
+    <div class="btns">
+      <button id="btnAttack" class="elec">⚡ Spara Laser dal Monocolo [Spazio]</button>
+      <button id="btnAutoFire" class="active">Fuoco Auto: ON</button>
+      <button id="btnTrack" class="active">Traccia Volante: ON</button>
+      <button id="camClose" class="active">Primo Piano Monocolo</button>
+      <button id="camBoth">Confronto Base</button>
+      <button id="camIso">Vista Gioco (Iso)</button>
+      <button id="btnTurn">Ruota 360°: OFF</button>
+    </div>
+
+    <div class="hint">
+      <b>Novità:</b><br>
+      • <b>Monocolo Scouter:</b> visiera azzurra semitrasparente staccata dal muso (zero compenetrazione), braccetto auricolare, mirino concentrico luminoso e occhio visibile dietro la lente.<br>
+      • <b>Lv 4 (Max):</b> leggera aura azzurrina pulsante attorno al corpo + particelle energetiche ascendenti.
+    </div>
+  </div>
+
+  <div id="labels"></div>
+
+  <div id="err">
+    <strong style="color:#f87171;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startSpike(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startSpike() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startSpike() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const rr = (a, b) => a + Math.random() * (b - a);
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+
+  const COL = {
+    iron: C(0x3b485b), steel: C(0x8899ad), stoneD: C(0x1e293b),
+    black: [0.04, 0.05, 0.07], gold: C(0xeab308), cyber: C(0x38bdf8),
+    cyberBright: C(0x9be7ff), ledGreen: C(0x4ade80)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a101a);
+  scene.fog = new THREE.FogExp2(0x0a101a, 0.022);
+
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 120);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  const camGoal = { theta: 0.34, phi: 1.15, dist: 3.9, tx: 1.35, ty: 1.35, tz: 0.0 };
+  const camCur  = { ...camGoal };
+  function applyCamera() {
+    const h = camCur.dist * Math.sin(camCur.phi);
+    camera.position.set(
+      camCur.tx + h * Math.sin(camCur.theta),
+      camCur.ty + camCur.dist * Math.cos(camCur.phi),
+      camCur.tz + h * Math.cos(camCur.theta)
+    );
+    camera.lookAt(camCur.tx, camCur.ty, camCur.tz);
+  }
+  applyCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camGoal.theta -= dx * 0.008;
+      camGoal.phi = clamp(camGoal.phi - dy * 0.008, 0.14, HPI - 0.04);
+    } else {
+      const pan = camGoal.dist * 0.0016;
+      camGoal.tx -= (Math.cos(camGoal.theta) * dx + Math.sin(camGoal.theta) * dy) * pan;
+      camGoal.tz -= (-Math.sin(camGoal.theta) * dx + Math.cos(camGoal.theta) * dy) * pan;
+    }
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camGoal.dist = clamp(camGoal.dist * (e.deltaY > 0 ? 1.09 : 0.91), 2.1, 18);
+  }, { passive: false });
+
+  // Luci
+  scene.add(new THREE.HemisphereLight(0xb8d8ff, 0x162030, 1.15));
+  const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.3);
+  dirLight.position.set(5, 12, 8);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const auraLight = new THREE.PointLight(0x38bdf8, 0, 7.5);
+  auraLight.position.set(1.35, 1.3, 0.2);
+  scene.add(auraLight);
+
+  // Pavimento
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 24), new THREE.MeshStandardMaterial({ color: 0x111926, roughness: 0.78 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+    const grid = new THREE.GridHelper(30, 30, 0x24364f, 0x141e2c);
+    grid.position.y = 0.005;
+    scene.add(grid);
+  }
+
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const b = 1 + (o.emis || 0) * 1.45;
+      this.items.push({ g, c: [Math.min(1, c[0] * b), Math.min(1, c[1] * b), Math.min(1, c[2] * b)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 10), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 10, o.h || 7), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    tri(a, b, cPt, col) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...cPt], 3)); this._push(g, col, {});
+    }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    build() {
+      let total = 0; for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) { col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2]; }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.48, metalness: 0.14 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S); this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1)); m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat, flash = 0) {
+      if (this.n >= this.cap) return; const i = this.n++; this.mesh.setMatrixAt(i, mat);
+      const col = new THREE.Color(1, 1, 1);
+      if (flash > 0) col.setRGB(1 + flash * 0.7, 1 + flash * 0.9, 1 + flash * 1.4);
+      this.mesh.setColorAt(i, col);
+    }
+    end() {
+      this.mesh.count = this.n; this.mesh.visible = this.n > 0;
+      if (this.n) { this.mesh.instanceMatrix.needsUpdate = true; if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true; }
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  // Due piedistalli affiancati
+  const SPOTS = [
+    { id: 'base', x: -1.65, y: 0.34, z: 0.0, title: 'GATTO BASE (0 DNA)', desc: 'Riferimento — Graffiatore', kind: 'base' },
+    { id: 'elec', x:  1.35, y: 0.34, z: 0.0, title: 'PROPOSTA A — Gatto Laser', desc: 'Monocolo Olografico + Aura Azzurrina Lv 4', kind: 'elec' },
+  ];
+
+  for (const sp of SPOTS) {
+    const S = new Soup(); const H = sp.y, R = sp.kind === 'base' ? 0.96 : 1.15;
+    S.cyl(R + .14, .14, 0, .07, 0, COL.stoneD, { n: 16 });
+    S.cyl(R, H, 0, H / 2, 0, COL.iron, { n: 16, rt: .93 });
+    S.add(gTorus(24, .042, 6), { s: R * .92, p: [0, H + .008, 0], r: [HPI, 0, 0], c: sp.kind === 'base' ? C(0xe8893c) : COL.cyber, emis: .65 });
+    const mesh = new THREE.Mesh(S.build(), MAT_INST);
+    mesh.position.set(sp.x, 0, sp.z); mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
+
+  const labelsRoot = document.getElementById('labels');
+  const labelEls = SPOTS.map(sp => {
+    const el = document.createElement('div');
+    el.className = 'tag ' + sp.kind;
+    el.innerHTML = `<div class="t">${sp.title}</div><div class="d">${sp.desc}</div>`;
+    labelsRoot.appendChild(el); return { sp, el };
+  });
+
+  // --- MONOCOLO OLOGRAFICO TRASLUCIDO (Group dedicato agganciato alla testa) ---
+  const monocleGroup = new THREE.Group();
+  let lensMat, reticleMesh, coreDot;
+  function buildHoloMonocle() {
+    // Posizionato leggermente staccato dal muso e inclinato per seguire la curvatura della testa!
+    const holder = new THREE.Group();
+    holder.position.set(0.155, 0.285, 0.405);
+    holder.rotation.set(-0.04, 0.24, 0.0);
+
+    // 1. Vetro olografico semitrasparente azzurrino (leggermente stondato/smussato)
+    lensMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8, transparent: true, opacity: 0.38,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+    });
+    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.165, 0.012), lensMat);
+    holder.add(lens);
+
+    // 2. Cornice olografica brillante (bordo superiore, inferiore e laterali)
+    const frameMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending });
+    const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.014, 0.018), frameMat); topBar.position.y = 0.086; holder.add(topBar);
+    const botBar = new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.014, 0.018), frameMat); botBar.position.y = -0.086; holder.add(botBar);
+    const leftBar = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.175, 0.018), frameMat); leftBar.position.x = -0.122; holder.add(leftBar);
+    const rightBar = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.185, 0.026), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.5, roughness: 0.35 }));
+    rightBar.position.x = 0.124; holder.add(rightBar);
+
+    // 3. Mirino concentrico rotante + punto focale bianco-ciano (origine del laser!)
+    reticleMesh = new THREE.Group();
+    reticleMesh.position.z = 0.012;
+    const ring1 = new THREE.Mesh(new THREE.RingGeometry(0.048, 0.058, 24), new THREE.MeshBasicMaterial({ color: 0xb8f2ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    reticleMesh.add(ring1);
+    const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.024, 0.030, 18), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    reticleMesh.add(ring2);
+    // 4 tacche a croce sul mirino
+    const tickMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
+    for (let k = 0; k < 4; k++) {
+      const a = k * HPI;
+      const tk = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.007, 0.004), tickMat);
+      tk.position.set(Math.cos(a) * 0.068, Math.sin(a) * 0.068, 0.002);
+      tk.rotation.z = a;
+      reticleMesh.add(tk);
+    }
+    holder.add(reticleMesh);
+
+    coreDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 8, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending })
+    );
+    coreDot.position.z = 0.014;
+    holder.add(coreDot);
+
+    // 4. Micro tacche HUD laterali (stile Scouter)
+    for (let i = 0; i < 3; i++) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.032 - i * 0.006, 0.010, 0.005), frameMat);
+      bar.position.set(0.075, 0.045 - i * 0.024, 0.01);
+      holder.add(bar);
+    }
+
+    monocleGroup.add(holder);
+    scene.add(monocleGroup);
+  }
+  buildHoloMonocle();
+
+  // --- AURA AZZURRINA LEGGERA PER LV 4 (Gatto Cyborg) ---
+  const auraGroup = new THREE.Group();
+  let auraShellMat, auraRingMat, auraRing2;
+  const auraMotes = [];
+  function buildLv4Aura() {
+    // 1. Guscio energetico morbido semitrasparente attorno al corpo
+    auraShellMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8, transparent: true, opacity: 0.13,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide
+    });
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.88, 18, 14), auraShellMat);
+    shell.scale.set(0.95, 1.18, 0.95);
+    shell.position.y = 0.68;
+    auraGroup.add(shell);
+
+    // 2. Anello energetico morbido alla base del gatto
+    auraRingMat = new THREE.MeshBasicMaterial({
+      color: 0x7dd3fc, transparent: true, opacity: 0.36,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+    });
+    const ringBase = new THREE.Mesh(new THREE.RingGeometry(0.66, 0.84, 36), auraRingMat);
+    ringBase.rotation.x = -HPI;
+    ringBase.position.y = 0.03;
+    auraGroup.add(ringBase);
+
+    // 3. Leggero alone circolare che sale dolcemente
+    auraRing2 = new THREE.Mesh(
+      new THREE.TorusGeometry(0.68, 0.016, 6, 32),
+      new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    auraRing2.rotation.x = HPI;
+    auraRing2.position.y = 0.45;
+    auraGroup.add(auraRing2);
+
+    // 4. 16 particelle/scintille azzurrine che fluttuano verso l'alto
+    const moteGeo = new THREE.OctahedronGeometry(0.035, 0);
+    for (let i = 0; i < 16; i++) {
+      const m = new THREE.Mesh(
+        moteGeo,
+        new THREE.MeshBasicMaterial({ color: (i & 1) ? 0x7dd3fc : 0xb8f2ff, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      auraGroup.add(m);
+      auraMotes.push({ mesh: m, a: (i / 16) * TAU, r: rr(0.52, 0.85), y: rr(0.05, 1.45), spd: rr(0.45, 0.9) });
+    }
+
+    auraGroup.visible = false;
+    scene.add(auraGroup);
+  }
+  buildLv4Aura();
+
+  // Modelli 3D
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    // Gatto Base
+    KIT.base = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0,0,0], [0,.24,-.22], .075, .062, fur, { n: 6 }); S.seg([0,.24,-.22], [0,.56,-.16], .062, .05, furD, { n: 6 });
+        S.seg([0,.56,-.16], [0,.8,-.28], .05, .036, fur, { n: 5 }); S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA A RIFINITA — Bionico Leggero (con occhio naturale visibile dietro al monocolo traslucido + modulo auricolare curato)
+    KIT.elecA = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        // Zampa posteriore destra naturale, sinistra semi-bionica
+        S.sph(.19, -.3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 }); S.sph(.11, -.31, .07, .12, cream, { sc: [1, .65, 1.25], w: 6, h: 4 });
+        S.sph(.19, .3, .18, -.08, COL.steel, { sc: [.85, .85, 1.25], w: 8, h: 6 }); S.sph(.11, .31, .07, .12, COL.iron, { sc: [1, .65, 1.25], w: 6, h: 4 });
+        // Collare tech con scatoletta e 2 micro LED
+        S.add(gTorus(14, .15, 5), { s: .275, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.box(.14, .09, .08, 0, .72, .30, COL.iron);
+        S.box(.11, .06, .085, 0, .72, .305, COL.steel);
+        S.sph(.022, -.026, .72, .352, COL.cyberBright, { w: 5, h: 4, emis: 1.0 });
+        S.sph(.022,  .026, .72, .352, COL.ledGreen,    { w: 5, h: 4, emis: 1.0 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 12, h: 9 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 8, h: 6 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        // Entrambi gli occhi naturali (quello sinistro si intravede dietro la lente olografica, con riflesso azzurro!)
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.sph(.072, s * .135, .28, .325, s > 0 ? C(0x2899c4) : C(0x2d6a3e), { w: 8, h: 6, emis: s > 0 ? .28 : 0 });
+          S.box(.024, .09, .025, s * .135, .28, .388, COL.black);
+          S.sph(.018, s * .12, .3, .395, [1, 1, 1], { w: 4, h: 3, emis: .5 });
+        }
+        // Orecchio destro di pelo, orecchio sinistro con placca bionica curva
+        S.cone(.14, .31, -.21, .56, 0, fur, { n: 4, r: [0, 0, .24] }); S.cone(.082, .2, -.21, .54, .03, pink, { n: 4, r: [0, 0, .24] });
+        S.cone(.145, .32, .21, .56, 0, COL.steel, { n: 4, r: [0, 0, -.24] }); S.cone(.082, .2, .21, .54, .03, pink, { n: 4, r: [0, 0, -.24] });
+
+        // Modulo auricolare Scouter sulla tempia sinistra + braccetto che regge la lente
+        S.cyl(.11, .09, .38, .29, .10, COL.iron, { n: 10, r: [0, 0, HPI] });
+        S.cyl(.085, .10, .39, .29, .10, COL.steel, { n: 10, r: [0, 0, HPI] });
+        S.box(.04, .04, .09, .43, .29, .10, COL.cyber, { emis: .85 });
+        // Braccetto snodato dal modulo auricolare al bordo destro del monocolo
+        S.seg([.38, .29, .16], [.34, .29, .33], .028, .024, COL.iron, { n: 6 });
+        S.seg([.34, .29, .33], [.27, .285, .38], .024, .022, COL.steel, { n: 6 });
+        // Antenna sottile verso l'alto con punta luminosa
+        S.seg([.39, .36, .06], [.43, .69, -.02], .018, .009, COL.steel, { n: 6 });
+        S.sph(.034, .43, .71, -.02, COL.cyberBright, { w: 8, h: 6, emis: 1.0 });
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] }); S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 2, { shadow: false }),
+      pawCyber: new PartBatch(S => {
+        S.cyl(.092, .38, 0, -.14, .08, COL.steel, { n: 10, r: [.45, 0, 0] });
+        S.sph(.10, 0, -.05, .04, COL.iron, { w: 7, h: 5 });
+        S.sph(.112, 0, -.28, .18, COL.iron, { sc: [1.05, .75, 1.2], w: 8, h: 6 });
+        S.sph(.032, 0, -.14, .16, COL.cyberBright, { w: 6, h: 4, emis: 0.95 });
+      }, 2, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0,0,0], [0,.24,-.22], .075, .062, fur, { n: 6 });
+        S.seg([0,.24,-.22], [0,.56,-.16], .062, .05, COL.steel, { n: 7 });
+        S.add(gTorus(10, .22, 4), { s: .062, p: [0, .40, -.19], r: [HPI, 0, 0], c: COL.cyber, emis: .8 });
+        S.seg([0,.56,-.16], [0,.8,-.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+    };
+
+    // Tentacolo Alato bersaglio
+    KIT.tentacolo = {
+      body: new PartBatch(S => {
+        S.sph(.17, 0, .03, 0, C(0x482242), { sc: [.9, 1.05, 1.25], w: 7, h: 5 });
+        S.sph(.075, 0, .05, .18, C(0xd4ff42), { w: 6, h: 5, emis: .45 }); S.box(.035, .1, .02, 0, .05, .25, COL.black);
+      }, 4),
+      wing: new PartBatch(S => {
+        const w1 = C(0x5a2850), w2 = C(0x31152d);
+        const pts = [[0, 0, .12], [.24, .05, .18], [.58, .03, .08], [.5, 0, -.08], [.34, 0, -.03], [.24, 0, -.18], [.12, 0, -.08], [0, 0, -.15]];
+        for (let i = 1; i < pts.length - 1; i++) { S.tri(pts[0], pts[i + 1], pts[i], i & 1 ? w1 : w2); S.tri(pts[0], pts[i], pts[i + 1], i & 1 ? w1 : w2); }
+      }, 8, { shadow: false }),
+    };
+  }
+
+  // Raggio laser + glow impatto
+  const beams = [];
+  function spawnLaser(p1, p2, radius) {
+    const dir = p2.clone().sub(p1), len = dir.length();
+    const core = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.55, radius * 0.45, len, 6),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending })
+    );
+    const outer = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 1.45, radius * 1.2, len, 6),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending })
+    );
+    const grp = new THREE.Group();
+    grp.add(core); grp.add(outer);
+    grp.position.copy(p1).add(p2).multiplyScalar(0.5);
+    grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    scene.add(grp);
+    beams.push({ grp, core, outer, life: 0.16, max: 0.16 });
+  }
+
+  initModels();
+
+  const LVL_INFO = [
+    '',
+    ['1 DNA — Gatto Elettrico', '1 DNA (Normale)'],
+    ['2 DNA — Gatto Elettrico', '2 DNA (Paffuto)'],
+    ['3 DNA — Gatto Elettrico', '3 DNA (Grande)'],
+    ['4 DNA — Gatto Cyborg',    '4 DNA (Max + Aura Azzurra)']
+  ];
+  const SCALES = [0.86, 1.00, 1.15, 1.32, 1.50];
+  let dnaLvl = 4, autoFire = true, trackFlyer = true, turn360 = false, spinAngle = 0, atkTimer = 0, fireCd = 0.5;
+  const flyer = { x: 1.35, y: 3.4, z: 2.2, flash: 0 };
+  const eyeWorldPos = new THREE.Vector3();
+
+  function updateUI() {
+    document.getElementById('lblForm').textContent = LVL_INFO[dnaLvl][0];
+    document.getElementById('lblLvl').textContent  = LVL_INFO[dnaLvl][1];
+    const slots = document.getElementById('dnaSlots').children;
+    for (let i = 0; i < 4; i++) slots[i].classList.toggle('elec', i < dnaLvl);
+  }
+
+  function fireLaser() {
+    atkTimer = 1.0; flyer.flash = 1.0;
+    const tgt = new THREE.Vector3(flyer.x, flyer.y, flyer.z);
+    spawnLaser(eyeWorldPos, tgt, 0.024 + dnaLvl * 0.006);
+  }
+
+  document.getElementById('rngLvl').oninput = e => { dnaLvl = +e.target.value; updateUI(); };
+  document.getElementById('btnAttack').onclick = fireLaser;
+
+  const btnAuto = document.getElementById('btnAutoFire');
+  btnAuto.onclick = () => { autoFire = !autoFire; btnAuto.textContent = 'Fuoco Auto: ' + (autoFire ? 'ON' : 'OFF'); btnAuto.classList.toggle('active', autoFire); };
+  const btnTrack = document.getElementById('btnTrack');
+  btnTrack.onclick = () => { trackFlyer = !trackFlyer; btnTrack.textContent = 'Traccia Volante: ' + (trackFlyer ? 'ON' : 'OFF'); btnTrack.classList.toggle('active', trackFlyer); };
+  const btnTurn = document.getElementById('btnTurn');
+  btnTurn.onclick = () => { turn360 = !turn360; btnTurn.textContent = 'Ruota 360°: ' + (turn360 ? 'ON' : 'OFF'); btnTurn.classList.toggle('active', turn360); if (!turn360) spinAngle = 0; };
+
+  const camBtns = ['camClose', 'camBoth', 'camIso'];
+  function setCam(id, tx, ty, tz, dist, phi, theta) {
+    camGoal.tx = tx; camGoal.ty = ty; camGoal.tz = tz; camGoal.dist = dist; camGoal.phi = phi; camGoal.theta = theta;
+    for (const b of camBtns) document.getElementById(b).classList.toggle('active', b === id);
+  }
+  document.getElementById('camClose').onclick = () => setCam('camClose', 1.35, 1.35, 0.0, 3.9, 1.15, 0.34);
+  document.getElementById('camBoth').onclick  = () => setCam('camBoth',  0.0,  1.05, 0.0, 6.8, 1.05, 0.25);
+  document.getElementById('camIso').onclick   = () => setCam('camIso',   1.35, 0.95, 0.0, 6.4, 0.78, 0.72);
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); fireLaser(); } });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+  });
+
+  updateUI();
+
+  const projV = new THREE.Vector3(), _pos = new THREE.Vector3(), _quat = new THREE.Quaternion(), _scl = new THREE.Vector3();
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    SH.uTime.value += dt;
+    const t = SH.uTime.value;
+
+    for (const k of ['theta', 'phi', 'dist', 'tx', 'ty', 'tz']) camCur[k] = damp(camCur[k], camGoal[k], 8, dt);
+    applyCamera();
+
+    if (turn360) spinAngle += dt * 0.55;
+    atkTimer = Math.max(0, atkTimer - dt * 5.0);
+
+    // Tentacolo Alato in orbita
+    const fa = t * 0.8;
+    flyer.x = 1.35 + Math.cos(fa) * 3.2;
+    flyer.z = 1.4 + Math.sin(fa * 2) * 1.5;
+    flyer.y = 3.2 + Math.sin(fa * 3) * 0.22;
+    flyer.flash = Math.max(0, flyer.flash - dt * 6.5);
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    // Tentacolo Alato
+    const fYaw = Math.atan2(-Math.sin(fa) * 3.2, Math.cos(fa * 2) * 3.0);
+    const MF = xf(_M[10], null, flyer.x, flyer.y, flyer.z, -.15, fYaw, 0, 1.2, 1.2, 1.2);
+    KIT.tentacolo.body.put(MF, flyer.flash);
+    const flap = Math.sin(t * 14);
+    KIT.tentacolo.wing.put(xf(_M[11], MF, .1, .04, 0, 0, 0, flap * .85 + .1), flyer.flash);
+    KIT.tentacolo.wing.put(xf(_M[12], MF, -.1, .04, 0, 0, 0, -(flap * .85 + .1), -1, 1, 1), flyer.flash);
+
+    // Gatto Base
+    {
+      const sp = SPOTS[0], sc = SCALES[0], sq = 1 + Math.sin(t * 3.0) * .025, sx = 1 / Math.sqrt(sq);
+      const M0 = xf(_M[0], null, sp.x, sp.y + 0.04, sp.z, 0, turn360 ? spinAngle : 0, 0, sc * sx, sc * sq, sc * sx);
+      KIT.base.body.put(M0);
+      KIT.base.head.put(xf(_M[1], M0, 0, .78, .05, 0, 0, Math.sin(t * 2.1) * .05));
+      for (const s of [-1, 1]) KIT.base.paw.put(xf(_M[2 + (s > 0 ? 1 : 0)], M0, s * .18, .54, .18, 0, 0, 0));
+      KIT.base.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 4.5) * .4, Math.cos(t * 4.5) * .1));
+    }
+
+    // Proposta A Rifinita
+    {
+      const sp = SPOTS[1], sc = SCALES[dnaLvl], recoil = atkTimer > 0 ? Math.sin(atkTimer * PI) : 0;
+      const sq = 1 + Math.sin(t * 3.4) * .025 - recoil * .05, sx = 1 / Math.sqrt(sq);
+
+      let yaw = turn360 ? spinAngle : 0, pitch = 0;
+      if (trackFlyer && !turn360) {
+        const dx = flyer.x - sp.x, dy = flyer.y - (sp.y + 1.0 * sc), dz = flyer.z - sp.z;
+        yaw = Math.atan2(dx, dz) * 0.45;
+        pitch = -Math.atan2(dy, Math.hypot(dx, dz)) * 0.45;
+      }
+
+      const M0 = xf(_M[0], null, sp.x, sp.y + 0.04, sp.z, -recoil * .08, yaw, 0, sc * sx, sc * sq, sc * sx);
+      KIT.elecA.body.put(M0);
+      const MHead = xf(_M[1], M0, 0, .78, .05, pitch, 0, Math.sin(t * 2.2) * .045);
+      KIT.elecA.head.put(MHead, recoil * 0.25);
+      KIT.elecA.paw.put(xf(_M[2], M0, -.18, .54, .18, 0, 0, 0));
+      KIT.elecA.pawCyber.put(xf(_M[3], M0, .18, .54, .18 - recoil * .04, pitch * 0.15, 0, 0));
+      KIT.elecA.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 4.8) * .42, Math.cos(t * 4.8) * .1));
+
+      // Sincronizza il monocolo olografico traslucido esattamente sulla matrice della testa
+      MHead.decompose(_pos, _quat, _scl);
+      monocleGroup.position.copy(_pos);
+      monocleGroup.quaternion.copy(_quat);
+      monocleGroup.scale.copy(_scl);
+      reticleMesh.rotation.z = t * 1.4;
+      lensMat.opacity = 0.34 + 0.08 * Math.sin(t * 5) + recoil * 0.35;
+      coreDot.scale.setScalar(1 + recoil * 1.4);
+
+      // Origine esatta del raggio laser = centro del mirino del monocolo
+      monocleGroup.updateMatrixWorld(true);
+      coreDot.getWorldPosition(eyeWorldPos);
+
+      // Aura azzurrina leggera SOLO al livello massimo (4 DNA — Gatto Cyborg)
+      const isMax = dnaLvl >= 4;
+      auraGroup.visible = isMax;
+      auraLight.intensity = isMax ? (0.95 + Math.sin(t * 4.2) * 0.25) : 0;
+      if (isMax) {
+        auraGroup.position.set(sp.x, sp.y + 0.04, sp.z);
+        auraGroup.scale.setScalar(sc);
+        auraShellMat.opacity = 0.11 + Math.sin(t * 3.5) * 0.035 + recoil * 0.06;
+        auraRingMat.opacity = 0.30 + Math.sin(t * 4.0) * 0.09;
+        const waveY = (t * 0.45) % 1.0;
+        auraRing2.position.y = 0.08 + waveY * 1.35;
+        auraRing2.scale.setScalar(1.0 - waveY * 0.22);
+        auraRing2.material.opacity = Math.sin(waveY * PI) * 0.28;
+
+        for (const mt of auraMotes) {
+          mt.y += mt.spd * dt;
+          if (mt.y > 1.55) { mt.y = 0.05; mt.a = rr(0, TAU); }
+          const ang = mt.a + t * 0.55;
+          mt.mesh.position.set(Math.cos(ang) * mt.r, mt.y, Math.sin(ang) * mt.r);
+          mt.mesh.rotation.y = t * 3;
+          mt.mesh.material.opacity = Math.sin(clamp(mt.y / 1.55, 0, 1) * PI) * 0.65;
+        }
+      }
+    }
+
+    if (autoFire) {
+      fireCd -= dt;
+      if (fireCd <= 0) {
+        const rates = [0, 1.5, 2.0, 2.5, 3.5];
+        fireCd = 1 / rates[dnaLvl];
+        fireLaser();
+      }
+    }
+
+    for (let i = beams.length - 1; i >= 0; i--) {
+      const b = beams[i]; b.life -= dt;
+      if (b.life <= 0) {
+        scene.remove(b.grp);
+        b.core.geometry.dispose(); b.core.material.dispose();
+        b.outer.geometry.dispose(); b.outer.material.dispose();
+        beams.splice(i, 1);
+      } else {
+        const f = b.life / b.max;
+        b.core.material.opacity = f;
+        b.outer.material.opacity = f * 0.65;
+      }
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+
+    for (const { sp, el } of labelEls) {
+      const sc = sp.kind === 'base' ? SCALES[0] : SCALES[dnaLvl];
+      projV.set(sp.x, sp.y + 1.62 * sc + 0.35, sp.z).project(camera);
+      if (projV.z > 1) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + 'px';
+      el.style.top  = ((-projV.y * 0.5 + 0.5) * innerHeight) + 'px';
+    }
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>

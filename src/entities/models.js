@@ -417,6 +417,7 @@ function initBestiary() {
   initPurrcraftMonsters();
   initGattoGraffiatore();
   initGattoFuoco();
+  initGattoElettrico();
 }
 
 function rigSpider(e) {
@@ -865,6 +866,211 @@ function rigGattoFuoco(e, lvl) {
     if (lvl >= 4) K.volcanoVents.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1 + Math.sin(t * 5) * .14, 1), fl, null);
   } else {
     K.pack1.put(M0, fl, e.tint);
+  }
+  return M0;
+}
+
+function initGattoElettrico() {
+  const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+  const collar = C(0xd9383a), iron = C(0x3b485b), steel = C(0x8899ad);
+  const cyber = C(0x38bdf8), cyberB = C(0x9be7ff), ledG = C(0x4ade80);
+
+  KIT.gattoElettrico = {
+    body: new PartBatch(S => {
+      S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7, rough: .65 });
+      S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25, rough: .65 });
+      S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6, rough: .7 });
+      S.sph(.19, -.3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6, rough: .65 });
+      S.sph(.11, -.31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+      S.sph(.19, .3, .18, -.08, steel, { sc: [.85, .85, 1.25], w: 8, h: 6, l: L_METAL, rough: .38 });
+      S.sph(.11, .31, .07, .12, iron, { sc: [1.0, .65, 1.25], w: 6, h: 4, l: L_METAL, rough: .42 });
+      S.add(gTorus(14, .15, 5), { s: .275, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+      S.box(.14, .09, .08, 0, .72, .30, iron, { l: L_METAL, jit: 0 });
+      S.box(.11, .06, .085, 0, .72, .305, steel, { l: L_METAL, jit: 0 });
+      S.sph(.022, -.026, .72, .352, cyberB, { w: 5, h: 4, emis: .95, jit: 0 });
+      S.sph(.022,  .026, .72, .352, ledG,   { w: 5, h: 4, emis: .95, jit: 0 });
+    }, 32, { rad: .4 }),
+
+    head: new PartBatch(S => {
+      S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8, rough: .6 });
+      for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+      S.box(.15, .07, .08, 0, .13, .3, cream, { jit: 0 });
+      S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0], jit: 0 });
+      for (const s of [-1, 1]) {
+        S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35], jit: 0 });
+        for (const [wy, wz] of [[.19, .31], [.155, .3]]) {
+          S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3, jit: 0 });
+        }
+        S.sph(.072, s * .135, .28, .325, s > 0 ? C(0x2899c4) : C(0x2d6a3e), { w: 7, h: 5, rough: .2, emis: s > 0 ? .28 : 0, jit: 0 });
+        S.box(.024, .09, .025, s * .135, .28, .388, COL.black, { jit: 0 });
+        S.sph(.018, s * .12, .3, .395, [1, 1, 1], { w: 4, h: 3, emis: .45, jit: 0 });
+      }
+      S.cone(.14, .31, -.21, .56, 0, fur, { n: 4, r: [0, 0, .24] });
+      S.cone(.082, .2, -.21, .54, .03, pink, { n: 4, r: [0, 0, .24], jit: 0 });
+      S.cone(.145, .32, .21, .56, 0, steel, { n: 4, r: [0, 0, -.24], l: L_METAL, rough: .38 });
+      S.cone(.082, .2, .21, .54, .03, pink, { n: 4, r: [0, 0, -.24], jit: 0 });
+      // Modulo auricolare Scouter + braccetto + antenna
+      S.cyl(.11, .09, .38, .29, .10, iron, { n: 10, r: [0, 0, HPI], l: L_METAL, jit: 0 });
+      S.cyl(.085, .10, .39, .29, .10, steel, { n: 10, r: [0, 0, HPI], l: L_METAL, jit: 0 });
+      S.box(.04, .04, .09, .43, .29, .10, cyber, { emis: .85, jit: 0 });
+      S.seg([.38, .29, .16], [.34, .29, .33], .028, .024, iron, { n: 6, l: L_METAL, jit: 0 });
+      S.seg([.34, .29, .33], [.27, .285, .38], .024, .022, steel, { n: 6, l: L_METAL, jit: 0 });
+      S.seg([.39, .36, .06], [.43, .69, -.02], .018, .009, steel, { n: 6, l: L_METAL, jit: 0 });
+      S.sph(.034, .43, .71, -.02, cyberB, { w: 7, h: 5, emis: .95, jit: 0 });
+    }, 32, { rad: .36 }),
+
+    paw: new PartBatch(S => {
+      S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0], rough: .65 });
+      S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+    }, 32, { rad: .14, shadow: false }),
+
+    pawCyber: new PartBatch(S => {
+      S.cyl(.092, .38, 0, -.14, .08, steel, { n: 8, r: [.45, 0, 0], l: L_METAL, rough: .38 });
+      S.sph(.10, 0, -.05, .04, iron, { w: 6, h: 4, l: L_METAL });
+      S.sph(.112, 0, -.28, .18, iron, { sc: [1.05, .75, 1.2], w: 7, h: 5, l: L_METAL });
+      S.sph(.032, 0, -.14, .16, cyberB, { w: 5, h: 4, emis: .95, jit: 0 });
+    }, 32, { rad: .14, shadow: false }),
+
+    tail: new PartBatch(S => {
+      S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+      S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, steel, { n: 6, l: L_METAL });
+      S.add(gTorus(10, .22, 4), { s: .062, p: [0, .40, -.19], r: [HPI, 0, 0], c: cyber, emis: .8 });
+      S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, fur, { n: 5 });
+      S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+    }, 32, { rad: .1, shadow: false }),
+  };
+}
+
+function makeHoloMonocle() {
+  const root = new THREE.Group();
+  const holder = new THREE.Group();
+  holder.position.set(0.155, 0.285, 0.405);
+  holder.rotation.set(-0.04, 0.24, 0.0);
+
+  const lensMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8, transparent: true, opacity: 0.38,
+    blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false
+  });
+  holder.add(new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.165, 0.012), lensMat));
+
+  const frameMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.014, 0.018), frameMat); topBar.position.y = 0.086; holder.add(topBar);
+  const botBar = new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.014, 0.018), frameMat); botBar.position.y = -0.086; holder.add(botBar);
+  const leftBar = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.175, 0.018), frameMat); leftBar.position.x = -0.122; holder.add(leftBar);
+  const rightBar = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.185, 0.026), new THREE.MeshBasicMaterial({ color: 0x64748b }));
+  rightBar.position.x = 0.124; holder.add(rightBar);
+
+  const reticle = new THREE.Group();
+  reticle.position.z = 0.012;
+  reticle.add(new THREE.Mesh(new THREE.RingGeometry(0.048, 0.058, 20), new THREE.MeshBasicMaterial({ color: 0xb8f2ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })));
+  reticle.add(new THREE.Mesh(new THREE.RingGeometry(0.024, 0.030, 16), new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false })));
+  const tickMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  for (let k = 0; k < 4; k++) {
+    const a = k * HPI, tk = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.007, 0.004), tickMat);
+    tk.position.set(Math.cos(a) * 0.068, Math.sin(a) * 0.068, 0.002); tk.rotation.z = a;
+    reticle.add(tk);
+  }
+  holder.add(reticle);
+
+  const coreDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.018, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  coreDot.position.z = 0.014;
+  holder.add(coreDot);
+
+  for (let i = 0; i < 3; i++) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.032 - i * 0.006, 0.010, 0.005), frameMat);
+    bar.position.set(0.075, 0.045 - i * 0.024, 0.01);
+    holder.add(bar);
+  }
+
+  root.add(holder);
+  root.userData = { lensMat, reticle, coreDot };
+  root.visible = false;
+  return root;
+}
+
+function makeCyberAura() {
+  const grp = new THREE.Group();
+  const shellMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8, transparent: true, opacity: 0.12,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide
+  });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(0.88, 16, 12), shellMat);
+  shell.scale.set(0.95, 1.18, 0.95);
+  shell.position.y = 0.68;
+  grp.add(shell);
+
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x7dd3fc, transparent: true, opacity: 0.34,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  const ringBase = new THREE.Mesh(new THREE.RingGeometry(0.66, 0.84, 32), ringMat);
+  ringBase.rotation.x = -HPI;
+  ringBase.position.y = 0.03;
+  grp.add(ringBase);
+
+  const ring2Mat = new THREE.MeshBasicMaterial({
+    color: 0x5eead4, transparent: true, opacity: 0.26,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.016, 6, 28), ring2Mat);
+  ring2.rotation.x = HPI;
+  ring2.position.y = 0.45;
+  grp.add(ring2);
+
+  grp.userData = { shellMat, ringMat, ring2, ring2Mat };
+  grp.visible = false;
+  return grp;
+}
+
+const _ep = new THREE.Vector3(), _eq = new THREE.Quaternion(), _es = new THREE.Vector3();
+function rigGattoElettrico(e, lvl) {
+  const K = KIT.gattoElettrico, s = e.scale || 1, fl = e.flash || 0, sw = e.swipe || 0;
+  const t = SH.uTime.value * 3.4 + (e.ph || 0);
+  const puff = e.mutatePuff > 0 ? Math.sin(e.mutatePuff * PI) * .3 : 0;
+  const recoil = Math.sin(sw * PI);
+  const sq = 1 + Math.sin(t) * .025 - recoil * .05 + puff;
+  const sx = (1 / Math.sqrt(Math.max(.5, sq))) * (1 + puff * .6);
+
+  const M0 = xf(_M[0], null, e.x, e.y, e.z, -recoil * .08, e.yaw, 0, s * sx, s * sq, s * sx);
+  K.body.put(M0, fl, e.tint);
+
+  const MHead = xf(_M[1], M0, 0, .78, .05, (e.pitch || 0) * .5, 0, Math.sin(t * .65) * .045);
+  K.head.put(MHead, Math.min(1, fl + recoil * .22), e.tint);
+
+  K.paw.put(xf(_M[2], M0, -.18, .54, .18, 0, 0, 0), fl, e.tint);
+  K.pawCyber.put(xf(_M[3], M0, .18, .54, .18 - recoil * .04, (e.pitch || 0) * .15, 0, 0), fl, e.tint);
+  K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.6) * .42, Math.cos(t * 1.6) * .1), fl, e.tint);
+
+  if (e.eyePos) e.eyePos.set(0.155, 0.285, 0.42).applyMatrix4(MHead);
+
+  if (e.monocle) {
+    MHead.decompose(_ep, _eq, _es);
+    e.monocle.visible = true;
+    e.monocle.position.copy(_ep);
+    e.monocle.quaternion.copy(_eq);
+    e.monocle.scale.copy(_es);
+    const ud = e.monocle.userData;
+    ud.reticle.rotation.z = SH.uTime.value * 1.5;
+    ud.lensMat.opacity = 0.34 + 0.08 * Math.sin(t * 1.8) + recoil * 0.35;
+    ud.coreDot.scale.setScalar(1 + recoil * 1.3);
+  }
+  if (e.aura) {
+    const isMax = lvl >= 4;
+    e.aura.visible = isMax;
+    if (isMax) {
+      e.aura.position.set(e.x, e.y, e.z);
+      e.aura.scale.setScalar(s);
+      const ud = e.aura.userData;
+      ud.shellMat.opacity = 0.10 + Math.sin(t * 1.2) * 0.03 + recoil * 0.05;
+      ud.ringMat.opacity = 0.28 + Math.sin(t * 1.4) * 0.08;
+      const w = (SH.uTime.value * 0.45 + (e.ph || 0)) % 1.0;
+      ud.ring2.position.y = 0.08 + w * 1.35;
+      ud.ring2.scale.setScalar(1.0 - w * 0.22);
+      ud.ring2Mat.opacity = Math.sin(w * PI) * 0.26;
+    }
   }
   return M0;
 }

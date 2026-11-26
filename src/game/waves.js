@@ -57,7 +57,6 @@ function buildWave(k, level) {
   return q;
 }
 
-
 function startWave() {
   G.k = G.k % 5 + 1; G.queue = buildWave(G.k, G.level); if (waveNumber() > G.best) { G.best = waveNumber(); try { localStorage.setItem('cinderwatch.best', '' + G.best); } catch (e) {} } G.waveT = 0; G.spawning = true; G.bossWave = G.k === 5; G.waveKills = 0; G.waveLeaks = 0; G.bossDown = false; G.trickle = 6; G.trickleN = 0;
   sfx(G.bossWave ? 'hornBoss' : 'horn', G.B.cave.x, G.B.cave.z, 1.1);
@@ -72,7 +71,6 @@ function endWave() {
 }
 function updateWaves(dt) {
   if (G.phase !== 'play') return;
-  const B = G.B;
   if (G.spawning) {
     G.waveT += dt;
     while (G.queue.length && G.queue[0].t <= G.waveT) {
@@ -97,23 +95,27 @@ function updateWaves(dt) {
 }
 function callWaveEarly() { if (G.phase === 'play' && !G.spawning && !G.bossWave && G.nextIn > .4) { G.gold += Math.round(G.nextIn * 3); G.nextIn = .05; return true; } return false; }
 
-function padCoverage(pad, range, air) {
+function padCoverage(pad, range) {
   const B = G.B; let c = 0; const r2 = range * range;
   for (let i = 0; i < B.n; i += 2) if (dist2(pad.x, pad.z, B.px[i], B.pz[i]) < r2) c += PATH_STEP * 2;
   return c;
 }
 function buildTower(pad, kind, byPlayer) {
-  const def = TOWER[kind]; if (pad.tower || G.gold < def.cost[0] || G.phase !== 'play') return null;
-  G.gold -= def.cost[0]; UI.goldShown = Math.min(UI.goldShown, G.gold);
-  const t = new Tower(pad, kind, G.B.pads.indexOf(pad)); G.towers.push(t); UI.ping(pad.x, pad.y, pad.z, byPlayer); return t;
+  const k = 'archer';
+  if (pad.tower || G.gold < DNA_COSTS[0] || G.phase !== 'play') return null;
+  G.gold -= DNA_COSTS[0]; UI.goldShown = Math.min(UI.goldShown, G.gold);
+  const t = new Tower(pad, k, G.B.pads.indexOf(pad)); G.towers.push(t); UI.ping(pad.x, pad.y, pad.z, byPlayer); return t;
 }
-function upgradeTower(t, byPlayer) {
-  const maxL = t && (t.def.maxLvl ?? 2);
-  if (!t || t.lvl >= maxL || t.state !== 'active' || G.phase !== 'play') return false; const c = t.def.cost[t.lvl + 1]; if (G.gold < c) return false;
-  G.gold -= c; UI.goldShown = Math.min(UI.goldShown, G.gold); t.upgrade(); UI.ping(t.x, t.y, t.z, byPlayer); return true;
+function mutateTower(t, elem, byPlayer) {
+  if (!t || t.lvl >= 4 || t.state !== 'active' || G.phase !== 'play') return false;
+  const c = DNA_COSTS[t.lvl + 1]; if (G.gold < c) return false;
+  G.gold -= c; UI.goldShown = Math.min(UI.goldShown, G.gold);
+  t.mutate(elem); UI.ping(t.x, t.y, t.z, byPlayer); return true;
 }
+function upgradeTower(t, byPlayer) { return mutateTower(t, 'fire', byPlayer); }
 function sellTower(t) {
-  if (!t || !t.alive || G.phase !== 'play') return false; const refund = Math.round(t.spent * .6);
+  if (!t || !t.alive || G.phase !== 'play') return false;
+  const refund = Math.floor(t.spent * .5);
   G.gold += refund; t.sell(); const i = G.towers.indexOf(t); if (i >= 0) G.towers.splice(i, 1); return true;
 }
 
@@ -122,36 +124,29 @@ function aiThink(dt) {
   if (G.phase !== 'play' || UI.playerActive()) return;
   AI.think -= dt; if (AI.think > 0) return; AI.think = .5;
   const B = G.B, towers = G.towers.filter(t => t.alive), empty = B.pads.filter(p => !p.tower), N = towers.length;
-  const cnt = { archer: 0, bombard: 0, spire: 0, guard: 0 }; for (const t of towers) cnt[t.kind]++;
-  const ideal = { archer: .36, bombard: .22, spire: .2, guard: .22 };
-  const lt = G.leakTypes; let air = 0, armor = 0, swarm = 0; for (const ty in lt) { const c = MON[ty].cat; if (c === 'air') air += lt[ty]; else if (c === 'armor') armor += lt[ty]; else if (c === 'swarm') swarm += lt[ty]; }
-  const gatePress = sat(G.leaks / 8);
+  let nFire = 0, nElec = 0;
+  for (const t of towers) { if (t.prof.model === 'fire') nFire++; else if (t.prof.model === 'elec') nElec++; }
+  const airNeed = (G.k >= 3 || G.level > 0 || G.mons.some(m => m.fly && !m.dead)) ? 1 : 0;
   const opts = [];
-  for (const kind of TOWER_KINDS) {
-    const def = TOWER[kind];
-    let need = ideal[kind] * (N + 1.6) - cnt[kind] + .35;
-    if (kind === 'archer') need += swarm * .12 + (N === 0 ? 1 : 0); if (kind === 'spire') need += air * .28 + armor * .1; if (kind === 'bombard') need += armor * .08 + swarm * .06 + (N >= 2 && cnt.bombard === 0 ? .5 : 0); if (kind === 'guard') need += swarm * .04 + (N >= 1 && cnt.guard === 0 ? .9 : 0);
-    if (need <= 0) continue;
+
+  if (empty.length) {
+    const needBuild = Math.max(.35, (N < 3 ? 1.8 : 1.0) - N * .12);
     for (const pad of empty) {
-      const cov = padCoverage(pad, def.range[0]) / (def.range[0] * 2);
-      let sc = need * (.55 + cov * .5);
+      const cov = padCoverage(pad, 5.2) / 10.4;
       const rel = pad.s / B.L;
-      if (N < 2) sc *= 1 - Math.abs(rel - .42) * .9;
-      sc *= 1 + gatePress * (rel - .5) * .8;
-      let syn = 0;
-      for (const t of towers) { const d = Math.hypot(t.x - pad.x, t.z - pad.z); if (kind === 'guard' && t.kind !== 'guard' && d < t.range + 1.5) syn += .16; if (kind !== 'guard' && t.kind === 'guard' && d < def.range[0] + 1) syn += .2; if (t.kind === kind && d < 6) syn -= .12; }
-      if (kind === 'guard') { sc *= .8 + .5 * rel; for (const t of towers) if (t.kind === 'guard' && Math.abs(t.pad.s - pad.s) < 9) syn -= .5; }
-      sc *= 1 + syn;
-      opts.push({ sc, cost: def.cost[0], act: 'build', kind, pad });
+      let sc = needBuild * (.55 + cov * .55);
+      if (N < 2) sc *= 1 - Math.abs(rel - .42) * .85;
+      opts.push({ sc, cost: DNA_COSTS[0], act: 'build', pad });
     }
   }
   for (const t of towers) {
-    const maxL = t.def.maxLvl ?? 2;
-    if (t.state !== 'active' || t.lvl >= maxL) continue;
-    const c = t.def.cost[t.lvl + 1], use = sat(t.recent / 60);
-    let sc = (.5 + use * .9 + (t.lvl === 0 ? .18 : 0)) * (N >= 3 ? 1.25 : .75) * (empty.length === 0 ? 1.6 : 1) * (110 / c);
-    if (t.kind === 'archer') sc *= 1 + swarm * .08; if (t.kind === 'spire') sc *= 1 + air * .12 + armor * .05;
-    opts.push({ sc, cost: c, act: 'up', t });
+    if (t.state !== 'active' || t.lvl >= 4) continue;
+    const c = DNA_COSTS[t.lvl + 1], use = sat(t.recent / 60);
+    let elem = 'fire';
+    if (t.prof.model === 'elec') elem = 'elec';
+    else if (t.prof.model === 'base' && airNeed && nElec < Math.max(1, Math.floor(N / 2))) elem = 'elec';
+    const sc = (.6 + use * .9 + (t.lvl === 0 ? .35 : 0)) * (N >= 2 ? 1.3 : .8) * (empty.length === 0 ? 1.6 : 1) * (95 / c);
+    opts.push({ sc, cost: c, act: 'mut', t, elem });
   }
   if (!opts.length) return;
   opts.sort((a, b) => b.sc - a.sc);
@@ -162,8 +157,9 @@ function aiThink(dt) {
     if (!aff) return; pick = aff;
   }
   AI.wait = 0;
-  if (pick.act === 'build') buildTower(pick.pad, pick.kind, false); else upgradeTower(pick.t, false);
-  AI.think = N < 3 ? .12 : .8;
+  if (pick.act === 'build') buildTower(pick.pad, 'archer', false);
+  else mutateTower(pick.t, pick.elem, false);
+  AI.think = N < 3 ? .15 : .75;
 }
 
 function setPhase(p) {
@@ -177,9 +173,11 @@ function startCrumble() {
   const B = G.B;
   for (const m of G.mons) if (!m.dead) { shatter(e => rigMonster(e), m, [0, 1, 0], { spread: 1.2, life: 1 }); removeMonster(m); }
   for (const f of G.men) if (!f.dead) { f.weapon = KIT.item.blade; shatter(e => rigHuman(KIT.foot, SPEC.foot, e), f, [0, 1, 0], { spread: 1, life: 1 }); f.dead = f.gone = true; f.alive = false; if (f.flame) removeFlame(f.flame); }
-  G.mons.length = 0; G.men.length = 0; G.arrows.length = 0; G.shells.length = 0; G.stuck.length = 0;
+  G.mons.length = 0; G.men.length = 0; G.arrows.length = 0; G.shells.length = 0; G.stuck.length = 0; G.beams.length = 0;
   for (const t of G.towers) {
     t.em.alive = false; LT.emitters[t.idx] = null; removeFlame(t.flame); removeFlame(t.flame2); t.flame = t.flame2 = null; t.archers.length = 0; t.alive = false; t.state = 'gone';
+    if (t.monocle) t.monocle.visible = false;
+    if (t.aura) t.aura.visible = false;
     let best = null, bd = 1e9; for (const p of B.pieces) if (p.kind === 'chunk') { const d = dist2(p.cx, p.cz, t.x, t.z); if (d < bd) { bd = d; best = p; } }
     if (best) best.mesh.attach(t.group);
   }
@@ -223,7 +221,7 @@ function updatePhase(dt) {
   for (let i = 1; i < B.flames.length; i++) B.flames[i].on = LT.beaconOn;
   if (G.phase === 'clear') { if (t > 2.6) setPhase('crumble'); }
   else if (G.phase === 'defeat') {
-    for (const tw of G.towers) { tw.em.on = damp(tw.em.on, 0, 1.5 + tw.idx * .15, dt); if (tw.flame) tw.flame.on = tw.em.on; if (tw.flame2) tw.flame2.on = tw.em.on; }
+    for (const tw of G.towers) { tw.em.on = damp(tw.em.on, 0, 1.5 + tw.idx * .15, dt); }
     if (t > 4.4) { G.level = 0; G.press = Math.max(.8, G.press * .85); G.run++; setPhase('crumble'); }
   } else if (G.phase === 'crumble') {
     let done = true;
