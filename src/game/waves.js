@@ -107,7 +107,7 @@ function buildTower(pad, kind, byPlayer) {
   const t = new Tower(pad, k, G.B.pads.indexOf(pad)); G.towers.push(t); UI.ping(pad.x, pad.y, pad.z, byPlayer); return t;
 }
 function mutateTower(t, elem, byPlayer) {
-  if (!t || t.lvl >= 4 || t.state !== 'active' || G.phase !== 'play') return false;
+  if (!t || !t.alive || t.lvl >= 4 || G.phase !== 'play') return false;
   const c = DNA_COSTS[t.lvl + 1]; if (G.gold < c) return false;
   G.gold -= c; UI.goldShown = Math.min(UI.goldShown, G.gold);
   t.mutate(elem); UI.ping(t.x, t.y, t.z, byPlayer); return true;

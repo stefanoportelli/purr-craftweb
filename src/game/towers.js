@@ -161,6 +161,7 @@ class Tower {
   begin() {
     const bp = blueprint(this.kind, this.lvl); this.bp = bp; this.mounts = bp.mounts; this.bt = 0; this.state = 'build';
     this.clearModel(true);
+    if (G.paused) { for (const p of bp.pieces) this.pieces.push({ mesh: new THREE.Mesh(p.soup.build(), MAT.world), y: p.y, t0: 0, landed: true, soup: p.soup }); this.finish(); this.appear = 1; return; }
     const n = bp.pieces.length, gap = Math.min(.2, 1.2 / n);
     bp.pieces.forEach((p, i) => {
       const mesh = new THREE.Mesh(p.soup.build(), MAT.world); mesh.castShadow = mesh.receiveShadow = true; mesh.visible = false; mesh.position.y = p.y + 2.2;
@@ -244,13 +245,15 @@ class Tower {
     this.group.add(this.gantry);
   }
   mutate(elem = 'fire') {
-    if (this.dna.length >= 4 || this.state !== 'active') return false;
+    if (this.dna.length >= 4 || !this.alive) return false;
+    if (this.state !== 'active') { this.finish(); this.appear = 1; }
     this.dna.push(elem);
     this.lvl = this.dna.length;
     this.spent += DNA_COSTS[this.lvl];
     this.prof = catProfile(this.dna);
     if (this.cat) {
       this.cat.mutatePuff = 1.0;
+      if (G.paused) { this.cat.scaleCur = this.prof.scale; this.cat.e.scale = this.prof.scale; }
       const pr = this.prof;
       this.em.I = pr.light;
       this.em.r = pr.col[0]; this.em.g = pr.col[1]; this.em.b = pr.col[2];

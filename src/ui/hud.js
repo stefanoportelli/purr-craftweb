@@ -567,7 +567,7 @@ const UI = (() => {
   function toggleCommand() { U.setManual(!U.manual); U.idle = 0; sfx('uiClick', CAM.x, CAM.z, .8); }
   function deny() { U.deny = 1; sfx('uiDeny', CAM.x, CAM.z, .6); buzz([18, 40, 18]); }
   function doBuild(pad, kind) { touchInput(); if (buildTower(pad, kind || 'archer', true)) { sfx('uiClick', pad.x, pad.z, .8); buzz(12); U.menu = null; U.armed = null; return true; } deny(); return false; }
-  function doMutate(t, elem) { if (mutateTower(t, elem, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); if (t.lvl >= 4) U.menu = null; return true; } deny(); return false; }
+  function doMutate(t, elem) { if (mutateTower(t, elem, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); U.menu = null; return true; } deny(); return false; }
   function doSell(t) { if (sellTower(t)) { U.menu = null; return true; } return false; }
   function pickKind(kind) {
     touchInput();
@@ -803,7 +803,7 @@ const UI = (() => {
       } else {
         // Menu Mutazione DNA (0-4 slot): Fuoco (Terra) o Laser/Elettrico (Aria)
         const t = m.tower, pr = t.prof, maxed = t.lvl >= 4, upc = maxed ? 0 : DNA_COSTS[t.lvl + 1];
-        const can = !maxed && G.gold >= upc && t.state === 'active', refund = Math.floor(t.spent * .5);
+        const can = !maxed && G.gold >= upc, refund = Math.floor(t.spent * .5);
         const nameCol = pr.model === 'elec' ? COLR.cold : (pr.model === 'fire' ? COLR.ember : COLR.amber);
         const st = '[' + pr.tag + '] Dmg ' + pr.dmg + ' · R ' + pr.range.toFixed(1) + (pr.splash > 0 ? ' · Spl ' + pr.splash.toFixed(1) : '');
 
