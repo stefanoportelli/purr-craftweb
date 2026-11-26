@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Spike Evoluzione: Gatto Fuoco (0 → 4 DNA)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #10161d; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #ui {
+      position: fixed; top: 16px; left: 16px; width: 335px; z-index: 10;
+      background: rgba(18, 25, 34, 0.93); border: 1px solid #3c2a24;
+      border-radius: 10px; padding: 14px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    }
+    h1 { font-size: 15px; margin-bottom: 8px; color: #ff8547; letter-spacing: 0.3px; }
+    #status {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0d131a; border: 1px solid #2c3545; border-radius: 6px;
+      padding: 7px 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .slots { display: flex; gap: 5px; align-items: center; }
+    .slot {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 1px solid #48566a; background: #161e29; transition: 0.2s;
+    }
+    .slot.fire {
+      background: radial-gradient(circle at 35% 35%, #ffe066, #ff4500 70%, #8a1500);
+      border-color: #ffad5c; box-shadow: 0 0 8px rgba(255, 90, 20, 0.75);
+    }
+    .stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+      background: #0d131a; border: 1px solid #242f3e; border-radius: 6px;
+      padding: 7px 9px; margin-bottom: 10px; font-size: 11.5px; color: #9fb0c4;
+    }
+    .stats b { color: #fff; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    button {
+      background: #233042; color: #fff; border: 1px solid #384a63;
+      border-radius: 6px; padding: 7px 8px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: #2f4057; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.fire {
+      background: linear-gradient(135deg, #c93814, #e8621c);
+      border-color: #ff9c54; grid-column: span 2; font-size: 13px; padding: 9px;
+    }
+    button.fire:hover:not(:disabled) { background: linear-gradient(135deg, #e0441c, #ff762b); }
+    button.active { background: #2b6cb0; border-color: #63b3ed; }
+    .row { margin-bottom: 9px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #9fb0c4; margin-bottom: 3px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #ff6b2b; cursor: pointer; }
+    .chk { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cbd5e1; cursor: pointer; margin-top: 5px; }
+    .hint { font-size: 11px; color: #6e8199; margin-top: 9px; border-top: 1px solid #253040; padding-top: 7px; line-height: 1.4; }
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content;
+      background: #1c2430; border: 1px solid #e5534b; border-radius: 10px; padding: 20px; z-index: 20;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0d1117; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>🔴 Spike Evoluzione: Gatto Fuoco</h1>
+    <div id="status">
+      <strong id="lblForm" style="color:#ffad5c;">0 DNA — Gatto Graffiatore</strong>
+      <div class="slots" id="dnaSlots">
+        <div class="slot"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div>Danno: <b id="stDmg">10 HP</b></div>
+      <div>Cadenza: <b id="stRate">1.5 /s</b></div>
+      <div>Splash: <b id="stSplash">Singolo</b></div>
+      <div>Raggio: <b id="stRange">4.4 u</b></div>
+    </div>
+
+    <div class="btns">
+      <button id="btnMutate" class="fire">+1 Fiala Fuoco 🔴 (30 DNA)</button>
+      <button id="btnResetDna">Reset a 0 DNA</button>
+      <button id="btnAutoFlow" class="active">Flusso Auto: ON</button>
+      <button id="btnSwarm">+ Sciame Polipetti</button>
+      <button id="btnTank">+ Abominio Tank</button>
+      <button id="btnAir">+ Tentacoli Alati</button>
+      <button id="btnResetCam">Reset Camera</button>
+    </div>
+
+    <div class="row">
+      <label>Velocità Simulazione: <span id="lblSpeed">1.00x</span></label>
+      <input id="rngSpeed" type="range" min="0.15" max="2.0" step="0.05" value="1.0" />
+    </div>
+
+    <label class="chk"><input id="chkRing" type="checkbox" checked /> Mostra anello raggio d'attacco</label>
+    <label class="chk"><input id="chkSplashRing" type="checkbox" checked /> Mostra area esplosione (Splash)</label>
+
+    <div class="hint">
+      <b>Test Evoluzione:</b> Premi il tasto rosso (o <b>Spazio</b>) per iniettare fiale di Fuoco da 0 a 4 DNA fino al <b>Gatto Vulcano (Chonker)</b>.<br>
+      <b>Profilo:</b> Solo TERRA (i Tentacoli Alati vengono ignorati).
+    </div>
+  </div>
+
+  <div id="err">
+    <strong style="color:#ff7b72;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startSpike(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startSpike() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startSpike() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const rr = (a, b) => a + Math.random() * (b - a);
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+  const angDiff = (a, b) => { let d = (b - a + PI) % TAU; if (d < 0) d += TAU; return d - PI; };
+  const angDamp = (a, b, k, dt) => a + angDiff(a, b) * (1 - Math.exp(-k * dt));
+
+  const COL = {
+    iron: C(0x4b5563), steel: C(0x8896a6), stoneD: C(0x2d3540),
+    black: [0.05, 0.06, 0.08], gold: C(0xf5c242)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  // Statistiche GDD (Sezione 3.1, 3.4, 3.8) adattate alla scala 3D della mappa
+  const FIRE_TIERS = [
+    { name: '0 DNA — Gatto Graffiatore', nextCost: 30, dmg: 10,  rate: 1.5, splash: 0.0, range: 4.4, scale: 0.86 },
+    { name: '1 DNA — Gatto Fuoco Lv 1',  nextCost: 50, dmg: 30,  rate: 1.5, splash: 1.0, range: 5.2, scale: 1.00 },
+    { name: '2 DNA — Gatto Fuoco Lv 2',  nextCost: 80, dmg: 65,  rate: 2.0, splash: 1.2, range: 5.8, scale: 1.16 },
+    { name: '3 DNA — Gatto Fuoco Lv 3',  nextCost: 120,dmg: 120, rate: 2.5, splash: 1.5, range: 6.4, scale: 1.34 },
+    { name: '4 DNA — Gatto Vulcano',     nextCost: 0,  dmg: 220, rate: 3.5, splash: 2.0, range: 7.2, scale: 1.56 },
+  ];
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x10161d);
+  scene.fog = new THREE.FogExp2(0x10161d, 0.028);
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 140);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // Controlli camera
+  let camTheta = 0.56, camPhi = 0.94, camDist = 11.0;
+  const camTarget = new THREE.Vector3(0, 0.5, 2.2);
+  function updateCamera() {
+    const h = camDist * Math.sin(camPhi);
+    camera.position.set(
+      camTarget.x + h * Math.sin(camTheta),
+      camTarget.y + camDist * Math.cos(camPhi),
+      camTarget.z + h * Math.cos(camTheta)
+    );
+    camera.lookAt(camTarget);
+  }
+  function resetCamera() {
+    camTheta = 0.56; camPhi = 0.94; camDist = 11.0;
+    camTarget.set(0, 0.5, 2.2);
+    updateCamera();
+  }
+  resetCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camTheta -= dx * 0.008;
+      camPhi = clamp(camPhi - dy * 0.008, 0.08, HPI - 0.04);
+    } else {
+      const pan = camDist * 0.0018;
+      camTarget.x -= (Math.cos(camTheta) * dx + Math.sin(camTheta) * dy) * pan;
+      camTarget.z -= (-Math.sin(camTheta) * dx + Math.cos(camTheta) * dy) * pan;
+    }
+    updateCamera();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camDist = clamp(camDist * (e.deltaY > 0 ? 1.1 : 0.91), 2.5, 24);
+    updateCamera();
+  }, { passive: false });
+
+  // Luci
+  scene.add(new THREE.HemisphereLight(0x9ec5e8, 0x1e2631, 1.1));
+  const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.3);
+  dirLight.position.set(6, 12, 7);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const fireGlowLight = new THREE.PointLight(0xff5a1f, 0, 10);
+  fireGlowLight.position.set(0, 1.4, 0);
+  scene.add(fireGlowLight);
+
+  // Ambiente & corsia stradale
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(32, 22), new THREE.MeshStandardMaterial({ color: 0x262f3b, roughness: 0.72 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(32, 32, 0x3b4859, 0x1d242e);
+    grid.position.y = 0.005;
+    scene.add(grid);
+
+    const road = new THREE.Mesh(new THREE.BoxGeometry(26, 0.04, 2.5), new THREE.MeshStandardMaterial({ color: 0x4b535e, roughness: 0.85 }));
+    road.position.set(0, 0.02, 3.0);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    for (const bz of [1.75, 4.25]) {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(26, 0.07, 0.08), new THREE.MeshStandardMaterial({ color: 0x2a313a }));
+      curb.position.set(0, 0.035, bz);
+      scene.add(curb);
+    }
+  }
+
+  let rangeRing = null;
+  function buildRangeRing(r, isFire) {
+    const vis = rangeRing ? rangeRing.visible : true;
+    if (rangeRing) { scene.remove(rangeRing); rangeRing.geometry.dispose(); }
+    rangeRing = new THREE.Mesh(
+      new THREE.RingGeometry(r - 0.06, r + 0.02, 80),
+      new THREE.MeshBasicMaterial({ color: isFire ? 0xff5a28 : 0xffc864, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
+    );
+    rangeRing.rotation.x = -HPI;
+    rangeRing.position.y = 0.055;
+    rangeRing.visible = vis;
+    scene.add(rangeRing);
+  }
+
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const boost = 1 + (o.emis || 0) * 1.45;
+      this.items.push({ g, c: [Math.min(1, c[0] * boost), Math.min(1, c[1] * boost), Math.min(1, c[2] * boost)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 8), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 8, o.h || 6), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    tri(a, b, cPt, col) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...cPt], 3));
+      this._push(g, col, {});
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    build() {
+      let total = 0;
+      for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) {
+          col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2];
+        }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.52, metalness: 0.1 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S);
+      this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1));
+      m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat, flash = 0, tint = null) {
+      if (this.n >= this.cap) return;
+      const i = this.n++;
+      this.mesh.setMatrixAt(i, mat);
+      const col = new THREE.Color(tint ? tint[0] : 1, tint ? tint[1] : 1, tint ? tint[2] : 1);
+      if (flash > 0) col.lerp(new THREE.Color(1, 1, 1), flash);
+      this.mesh.setColorAt(i, col);
+    }
+    end() {
+      this.mesh.count = this.n;
+      this.mesh.visible = this.n > 0;
+      if (this.n) {
+        this.mesh.instanceMatrix.needsUpdate = true;
+        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+      }
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    // Gatto Base (0 DNA)
+    KIT.gattoBase = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 4),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 4),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+        for (const cx of [-.055, 0, .055]) S.cone(.016, .085, cx, -.28, .31, [1, 1, 1], { n: 4, r: [HPI + .15, 0, 0], emis: .25 });
+      }, 8, { shadow: false }),
+      giantPaw: new PartBatch(S => {
+        const aura = [1.0, .94, .82], clawGlow = [.55, .96, 1.0];
+        S.sph(.28, 0, 0, -.04, aura, { sc: [1.25, .62, 1.35], w: 8, h: 6, emis: .45 });
+        S.sph(.13, 0, -.12, -.02, pink, { sc: [1.2, .4, 1.0], w: 6, h: 4, emis: .35 });
+        for (const [dx, dz] of [[-.16, .14], [-.06, .2], [.06, .2], [.16, .14]]) S.sph(.085, dx, -.02, dz, aura, { sc: [.9, .65, 1.15], w: 6, h: 4, emis: .5 });
+        for (const cx of [-.17, -.06, .06, .17]) S.cone(.036, .28, cx, -.02, .34, clawGlow, { n: 4, r: [HPI + .18, 0, 0], emis: .85 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .8, -.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 4, { shadow: false }),
+    };
+
+    // Elemento Fuoco (1-4 DNA) — Pelo Piro-Rosso, Criniera di Fiamme, Cratere Vulcanico sul dorso al Lv 4
+    const fRed = C(0xc83218), fDark = C(0x6e1810), fBelly = C(0xffd078), fGold = C(0xffb428), fCore = C(0xfff08a), basalt = C(0x2e2326);
+    KIT.gattoFuoco = {
+      body: new PartBatch(S => {
+        S.sph(.39, 0, .29, -.03, fRed, { sc: [1.1, .94, 1.14], w: 10, h: 7 });
+        S.cyl(.27, .46, 0, .54, .02, fRed, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .20, fBelly, { sc: [.92, 1.15, .65], w: 8, h: 6, emis: .15 });
+        for (const s of [-1, 1]) {
+          S.sph(.20, s * .31, .19, -.08, fDark, { sc: [.88, .86, 1.25], w: 8, h: 6 });
+          S.sph(.115, s * .32, .07, .12, fGold, { sc: [1.0, .65, 1.25], w: 6, h: 4, emis: .25 });
+        }
+        // Collare di ossidiana + gemma di magma
+        S.add(gTorus(12, .16, 5), { s: .28, p: [0, .74, .04], r: [HPI, 0, 0], c: basalt });
+        S.sph(.075, 0, .72, .32, fCore, { w: 6, h: 4, emis: .85 });
+      }, 4),
+      head: new PartBatch(S => {
+        S.sph(.37, 0, .26, .02, fRed, { sc: [1.15, .96, 1.04], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, fBelly, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, fBelly);
+        S.cone(.042, .045, 0, .21, .39, fDark, { n: 4, r: [HPI, 0, 0] });
+        // Ciuffo fiamma in cima alla testa
+        S.cone(.11, .28, 0, .62, .05, fGold, { n: 5, r: [-.18, 0, 0], emis: .55 });
+        S.cone(.065, .22, 0, .66, .08, fCore, { n: 4, r: [-.1, 0, 0], emis: .9 });
+        for (const s of [-1, 1]) {
+          S.box(.08, .02, .02, s * .045, .14, .36, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.145, .32, s * .22, .57, 0, fRed, { n: 4, r: [0, 0, s * -.25] });
+          S.cone(.085, .21, s * .22, .55, .03, fGold, { n: 4, r: [0, 0, s * -.25], emis: .6 });
+          // Occhi gialli incandescenti + sopracciglia fiere
+          S.sph(.075, s * .135, .28, .335, fCore, { w: 7, h: 5, emis: .9 });
+          S.box(.022, .085, .025, s * .135, .28, .405, fDark);
+          S.box(.14, .032, .04, s * .14, .36, .35, fDark, { r: [0, 0, s * -.28] });
+        }
+      }, 4),
+      paw: new PartBatch(S => {
+        S.cyl(.098, .38, 0, -.14, .08, fRed, { n: 8, r: [.45, 0, 0] });
+        S.sph(.12, 0, -.28, .18, fGold, { sc: [1.05, .75, 1.2], w: 7, h: 5, emis: .45 });
+      }, 8, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fRed, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, fDark, { n: 6 });
+        S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, fRed, { n: 5 });
+        // Fiamma viva sulla punta della coda
+        S.cone(.10, .26, 0, .92, -.30, fGold, { n: 5, emis: .75 });
+        S.sph(.075, 0, .84, -.30, fCore, { w: 6, h: 5, emis: .95 });
+      }, 4, { shadow: false }),
+      // Criniera di fiamme (Lv 2+)
+      mane: new PartBatch(S => {
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU;
+          S.cone(.11, .28, Math.cos(a) * .33, .06, Math.sin(a) * .33, (i & 1) ? fGold : C(0xff521b), {
+            n: 4, r: [Math.sin(a) * .65, 0, -Math.cos(a) * .65], emis: .75
+          });
+        }
+      }, 4, { shadow: false }),
+      // Cratere vulcanico sulla schiena (Lv 4 — Gatto Vulcano)
+      volcano: new PartBatch(S => {
+        S.cyl(.30, .28, 0, .12, 0, basalt, { n: 8, rt: .62 });
+        S.cyl(.17, .06, 0, .27, 0, fCore, { n: 8, emis: 1.0 });
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU;
+          S.cone(.07, .24, Math.cos(a) * .11, .36, Math.sin(a) * .11, (i & 1) ? fCore : fGold, { n: 4, emis: .95 });
+        }
+      }, 4, { shadow: false }),
+      fireball: new PartBatch(S => {
+        S.sph(.20, 0, 0, 0, C(0xff4a14), { w: 8, h: 6, emis: .85 });
+        S.sph(.13, 0, 0, .06, fCore, { w: 6, h: 5, emis: 1.0 });
+      }, 24, { shadow: false }),
+    };
+
+    // Nemici: Polipetto, Abominio di Roccia, Tentacolo Alato
+    KIT.polipetto = {
+      body: new PartBatch(S => {
+        S.sph(.24, 0, .24, 0, C(0x3a2648), { sc: [.95, 1.15, 1.1], w: 8, h: 6 });
+        S.box(.18, .09, .1, 0, .11, .16, COL.black);
+        for (const [ex, ey, ez, er] of [[-.09, .26, .18, .05], [.09, .25, .18, .045], [0, .34, .15, .058]]) {
+          S.sph(er, ex, ey, ez, C(0xb8ff38), { w: 6, h: 4, emis: .35 });
+        }
+      }, 60),
+      tentacle: new PartBatch(S => {
+        S.seg([0, 0, 0], [.18, -.03, 0], .048, .032, C(0x335c38), { n: 5 });
+        S.seg([.18, -.03, 0], [.34, .03, 0], .032, .012, C(0x63a844), { n: 5 });
+      }, 360, { shadow: false })
+    };
+
+    KIT.abominio = {
+      body: new PartBatch(S => {
+        const rk = C(0x4b4752), rkD = C(0x2c2832), goo = C(0x4fa638);
+        S.box(.62, .68, .54, 0, .58, 0, rk);
+        S.box(.44, .34, .36, 0, 1.02, .06, rkD);
+        S.box(.74, .22, .32, 0, .82, -.02, rkD);
+        for (const s of [-1, 1]) {
+          S.box(.22, .52, .22, s * .42, .45, .04, rk);
+          S.box(.2, .36, .24, s * .18, .18, 0, rkD);
+          S.sph(.065, s * .11, 1.06, .25, C(0xb8ff38), { w: 6, h: 4, emis: .6 });
+        }
+        S.sph(.16, 0, .62, .26, goo, { w: 6, h: 5, emis: .35 });
+      }, 16),
+    };
+
+    KIT.tentacolo = {
+      body: new PartBatch(S => {
+        S.sph(.17, 0, .03, 0, C(0x482242), { sc: [.9, 1.05, 1.25], w: 7, h: 5 });
+        S.sph(.075, 0, .05, .18, C(0xd4ff42), { w: 6, h: 5, emis: .35 });
+        S.box(.035, .1, .02, 0, .05, .25, COL.black);
+      }, 20),
+      wing: new PartBatch(S => {
+        const w1 = C(0x5a2850), w2 = C(0x31152d);
+        const pts = [[0, 0, .12], [.24, .05, .18], [.58, .03, .08], [.5, 0, -.08], [.34, 0, -.03], [.24, 0, -.18], [.12, 0, -.08], [0, 0, -.15]];
+        for (let i = 1; i < pts.length - 1; i++) {
+          S.tri(pts[0], pts[i + 1], pts[i], i & 1 ? w1 : w2);
+          S.tri(pts[0], pts[i], pts[i + 1], i & 1 ? w1 : w2);
+        }
+      }, 40, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, -.2, -.12], .032, .02, C(0x335c38), { n: 4 });
+        S.seg([0, -.2, -.12], [0, -.38, -.22], .02, .008, C(0x63a844), { n: 4 });
+      }, 60, { shadow: false }),
+    };
+  }
+
+  function rigCat(e, fireLvl) {
+    const isFire = fireLvl > 0;
+    const K = isFire ? KIT.gattoFuoco : KIT.gattoBase;
+    const s = e.scale || 1, fl = e.flash || 0, sw = e.swipe || 0;
+    const t = SH.uTime.value * (isFire ? 3.8 : 3.0);
+
+    // Effetto "palloncino" (Squash & Stretch) alla mutazione (GDD 6.1)
+    const puff = e.mutatePuff > 0 ? Math.sin(e.mutatePuff * PI) * 0.32 : 0;
+    const lunge = isFire ? -Math.sin(sw * PI) * 0.22 : Math.sin(sw * PI);
+    const sq = 1 + Math.sin(t) * .03 - lunge * .08 + puff;
+    const sx = (1 / Math.sqrt(Math.max(0.5, sq))) * (1 + puff * 0.65);
+
+    const M0 = xf(_M[0], null, e.x, e.y, e.z, lunge * .26, e.yaw, 0, s * sx, s * sq, s * sx);
+    K.body.put(M0, fl, null);
+
+    const MHead = xf(_M[1], M0, 0, .78, .05, (e.pitch || 0) - lunge * .25, 0, Math.sin(t * .7) * .06);
+    K.head.put(MHead, fl, null);
+
+    for (const side of [-1, 1]) {
+      const active = isFire ? Math.sin(sw * PI) : (side === e.pawSide ? Math.sin(sw * PI) : 0);
+      const mp = xf(_M[2 + (side > 0 ? 1 : 0)], M0, side * .18, .54, .18 + active * .32, -active * 1.15, side * -active * .3, side * active * .22);
+      K.paw.put(mp, fl, null);
+    }
+
+    if (!isFire && sw > .01) {
+      const prog = 1 - sw, reach = Math.min(1, prog * 3.4);
+      const pulse = prog < .22 ? (.45 + .55 * (prog / .22)) : Math.max(.01, 1 - (prog - .22) / .78);
+      const pz = lerp(.35 * s, e.hitDist, reach), py = lerp(.54 * s, e.hitDy, reach);
+      const dir = e.pawSide || 1;
+      const MRoot = xf(_M[5], null, e.x, e.y, e.z, 0, e.yaw, 0, 1, 1, 1);
+      const gs = Math.min(1.35, s) * pulse * 1.2;
+      KIT.gattoBase.giantPaw.put(xf(_M[6], MRoot, dir * .12 * (1 - reach), py, pz, -.25 + reach * .55, 0, dir * (.45 - prog * .9), gs, gs, gs * (1 + (1 - reach) * .75)), fl, null);
+    }
+
+    if (isFire && fireLvl >= 2) {
+      const ms = 0.85 + fireLvl * 0.08;
+      K.mane.put(xf(_M[7], M0, 0, .72, .02, 0, t * .6, 0, ms, ms * (1 + Math.sin(t * 2.5) * .12), ms), fl, null);
+    }
+    if (fireLvl >= 4) {
+      K.volcano.put(xf(_M[8], M0, 0, .58, -.28, -.35, 0, 0, 1.0, 1.0 + Math.sin(t * 4) * .08, 1.0), fl, null);
+    }
+
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.8) * .48, Math.cos(t * 1.8) * .12), fl, null);
+  }
+
+  // Plinto fisso + Passerella telescopica (usata solo a 0 DNA)
+  const GANTRY_H = 0.34, GANTRY_R = 0.88, PAD_R = 0.58, REACH = 1.35;
+  let gantryRail, gantryPad;
+  function buildTowerBase() {
+    const metal = COL.iron, steel = COL.steel, dark = COL.stoneD, warnY = [.95, .78, .12];
+    const SP = new Soup();
+    SP.cyl(GANTRY_R + .14, .16, 0, .08, 0, dark);
+    SP.cyl(GANTRY_R, GANTRY_H, 0, GANTRY_H / 2, 0, metal, { rt: .92 });
+    for (let k = 0; k < 4; k++) {
+      const a = k * HPI + PI / 4;
+      SP.box(.26, .22, .2, Math.cos(a) * (GANTRY_R + .04), .12, Math.sin(a) * (GANTRY_R + .04), steel, { r: [0, -a + HPI, 0] });
+    }
+    const plinth = new THREE.Mesh(SP.build(), MAT_INST);
+    plinth.castShadow = plinth.receiveShadow = true;
+    scene.add(plinth);
+
+    const SR = new Soup();
+    SR.box(1.12, .12, REACH, 0, GANTRY_H - .02, REACH / 2, metal);
+    SR.box(.94, .04, REACH, 0, GANTRY_H + .055, REACH / 2, steel);
+    for (const side of [-1, 1]) {
+      for (let s = 0; s < 4; s++) SR.box(.06, .1, REACH / 4 - .02, side * .58, GANTRY_H - .01, (s + .5) * (REACH / 4), (s & 1) ? COL.black : warnY);
+      SR.seg([side * .38, .1, .08], [side * .38, GANTRY_H - .04, REACH], .065, .055, steel);
+    }
+    gantryRail = new THREE.Mesh(SR.build(), MAT_INST);
+    gantryRail.castShadow = gantryRail.receiveShadow = true;
+    gantryRail.scale.z = 0.01;
+    gantryRail.visible = false;
+    scene.add(gantryRail);
+
+    const SD = new Soup();
+    SD.cyl(PAD_R + .06, .06, 0, GANTRY_H + .02, 0, metal);
+    SD.cyl(PAD_R, .08, 0, GANTRY_H + .05, 0, steel);
+    gantryPad = new THREE.Mesh(SD.build(), MAT_INST);
+    gantryPad.castShadow = gantryPad.receiveShadow = true;
+    scene.add(gantryPad);
+  }
+
+  // Effetti: scie graffi, proiettili palla di fuoco, esplosioni splash e scintille
+  const slashes = [], fireballs = [], explosions = [], sparks = [];
+  function spawnClawSlashes(hx, hy, hz, yaw, dir) {
+    const cs = Math.cos(yaw), sn = Math.sin(yaw);
+    for (let k = -1; k <= 1; k++) {
+      const ox = cs * k * .11, oz = -sn * k * .11, oy = k * .06;
+      const p1 = new THREE.Vector3(hx - cs * .26 * dir + ox, hy + .22 + oy, hz + sn * .26 * dir + oz);
+      const p2 = new THREE.Vector3(hx + cs * .26 * dir + ox, hy - .22 + oy, hz - sn * .26 * dir + oz);
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, p1.distanceTo(p2), 0.035),
+        new THREE.MeshBasicMaterial({ color: 0xdffaff, transparent: true, opacity: 1 })
+      );
+      mesh.position.copy(p1.clone().add(p2).multiplyScalar(0.5));
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p2.clone().sub(p1).normalize());
+      scene.add(mesh);
+      slashes.push({ mesh, life: 0.22, max: 0.22 });
+    }
+  }
+
+  function spawnExplosion(x, y, z, radius, lvl) {
+    // Sfera esplosione cartoon
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(radius * 0.48, 10, 8),
+      new THREE.MeshBasicMaterial({ color: lvl >= 4 ? 0xffe46b : 0xff6a1a, transparent: true, opacity: 0.9 })
+    );
+    ball.position.set(x, y + 0.18, z);
+    scene.add(ball);
+
+    // Anello splash a terra (mostra il raggio esatto del GDD)
+    let ring = null;
+    if (document.getElementById('chkSplashRing').checked) {
+      ring = new THREE.Mesh(
+        new THREE.RingGeometry(Math.max(0.05, radius - 0.12), radius, 36),
+        new THREE.MeshBasicMaterial({ color: 0xff4d14, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -HPI;
+      ring.position.set(x, 0.07, z);
+      scene.add(ring);
+    }
+    explosions.push({ ball, ring, life: 0.34, max: 0.34 });
+
+    // Scintille/lapilli
+    const nSparks = 8 + lvl * 3;
+    for (let i = 0; i < nSparks; i++) {
+      const a = rr(0, TAU), spd = rr(1.8, 4.5 + lvl * 0.6);
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, 0.09, 0.09),
+        new THREE.MeshBasicMaterial({ color: (i & 1) ? 0xffe066 : 0xff4500 })
+      );
+      m.position.set(x, y + 0.2, z);
+      scene.add(m);
+      sparks.push({ mesh: m, vx: Math.cos(a) * spd, vy: rr(2.4, 5.2), vz: Math.sin(a) * spd, life: rr(0.28, 0.55) });
+    }
+  }
+
+  // Flusso mostri
+  const mons = [];
+  function spawnSwarm(count = 6) {
+    for (let i = 0; i < count; i++) {
+      mons.push({
+        type: 'polipetto', fly: false, x: -11.5 - i * 0.72 - rr(0, 0.25), y: 0.04, z: rr(2.15, 3.85),
+        spd: rr(1.75, 2.05), hp: 50, maxHp: 50, rad: 0.24, hitH: 0.25, flash: 0, ph: rr(0, 6)
+      });
+    }
+  }
+  function spawnTank(count = 2) {
+    for (let i = 0; i < count; i++) {
+      mons.push({
+        type: 'abominio', fly: false, x: -11.5 - i * 2.2, y: 0.04, z: rr(2.45, 3.55),
+        spd: 0.92, hp: 350, maxHp: 350, rad: 0.48, hitH: 0.85, flash: 0, ph: rr(0, 6)
+      });
+    }
+  }
+  function spawnAir(count = 3) {
+    for (let i = 0; i < count; i++) {
+      mons.push({
+        type: 'tentacolo', fly: true, x: -11.5 - i * 1.6, y: rr(2.1, 2.7), z: rr(2.1, 3.9),
+        spd: 1.85, hp: 120, maxHp: 120, rad: 0.26, hitH: 0, flash: 0, ph: rr(0, 6)
+      });
+    }
+  }
+
+  initModels();
+  buildTowerBase();
+
+  let fireLvl = 0, timeScale = 1.0, autoFlow = true;
+  let flowTimer = 0.4, flowStep = 0;
+  const cat = { yaw: 0, pitch: 0, swipe: 0, pawSide: 1, cool: 0.2, ext: 0, holdT: 0, hitDist: 1.4, hitDy: 0.2, mutatePuff: 0, scaleCur: 0.86 };
+
+  function updateUI() {
+    const T = FIRE_TIERS[fireLvl];
+    document.getElementById('lblForm').textContent = T.name;
+    document.getElementById('stDmg').textContent = T.dmg + ' HP';
+    document.getElementById('stRate').textContent = T.rate.toFixed(1) + ' /s';
+    document.getElementById('stSplash').textContent = T.splash > 0 ? `R = ${T.splash.toFixed(1)} u` : 'Singolo';
+    document.getElementById('stRange').textContent = T.range.toFixed(1) + ' u';
+
+    const slots = document.getElementById('dnaSlots').children;
+    for (let i = 0; i < 4; i++) slots[i].classList.toggle('fire', i < fireLvl);
+
+    const btn = document.getElementById('btnMutate');
+    if (fireLvl >= 4) {
+      btn.textContent = '🔥 FORMA MAX: GATTO VULCANO';
+      btn.disabled = true;
+    } else {
+      btn.textContent = `+1 Fiala Fuoco 🔴 (${T.nextCost} DNA)`;
+      btn.disabled = false;
+    }
+    buildRangeRing(T.range, fireLvl > 0);
+  }
+
+  function mutateFire() {
+    if (fireLvl >= 4) return;
+    fireLvl++;
+    cat.mutatePuff = 1.0;
+    spawnExplosion(0, GANTRY_H + 0.35, cat.ext * REACH, 0.7 + fireLvl * 0.15, fireLvl);
+    updateUI();
+  }
+
+  document.getElementById('btnMutate').onclick = mutateFire;
+  document.getElementById('btnResetDna').onclick = () => { fireLvl = 0; cat.mutatePuff = 0.6; updateUI(); };
+  document.getElementById('btnSwarm').onclick = () => spawnSwarm(7);
+  document.getElementById('btnTank').onclick = () => spawnTank(2);
+  document.getElementById('btnAir').onclick = () => spawnAir(3);
+  document.getElementById('btnResetCam').onclick = resetCamera;
+
+  const btnAutoFlow = document.getElementById('btnAutoFlow');
+  btnAutoFlow.onclick = () => {
+    autoFlow = !autoFlow;
+    btnAutoFlow.textContent = 'Flusso Auto: ' + (autoFlow ? 'ON' : 'OFF');
+    btnAutoFlow.classList.toggle('active', autoFlow);
+  };
+  document.getElementById('rngSpeed').oninput = e => {
+    timeScale = +e.target.value;
+    document.getElementById('lblSpeed').textContent = timeScale.toFixed(2) + 'x';
+  };
+  document.getElementById('chkRing').onchange = e => { rangeRing.visible = e.target.checked; };
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); mutateFire(); } });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  updateUI();
+
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
+    last = now;
+    SH.uTime.value += dt;
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    if (autoFlow) {
+      flowTimer -= dt;
+      if (flowTimer <= 0) {
+        if (flowStep % 4 === 2) { spawnTank(1); spawnSwarm(5); flowTimer = 7.5; }
+        else if (flowStep % 4 === 3) { spawnAir(3); flowTimer = 5.5; }
+        else { spawnSwarm(6); flowTimer = 6.5; }
+        flowStep++;
+      }
+    }
+
+    // Aggiorna mostri
+    for (let i = mons.length - 1; i >= 0; i--) {
+      const m = mons[i];
+      m.x += m.spd * dt;
+      m.flash = Math.max(0, m.flash - dt * 6);
+      m.ph += dt * (m.fly ? 13 : (m.type === 'abominio' ? 4.5 : 8));
+      if (m.x > 13.0 || m.hp <= 0) { mons.splice(i, 1); continue; }
+
+      if (m.fly) {
+        const M0 = xf(_M[0], null, m.x, m.y + Math.sin(m.ph * .4) * .08, m.z, -.15, HPI, 0, 1.15, 1.15, 1.15);
+        KIT.tentacolo.body.put(M0, m.flash);
+        const f = Math.sin(m.ph);
+        KIT.tentacolo.wing.put(xf(_M[1], M0, .1, .04, 0, 0, 0, f * .85 + .15), m.flash);
+        KIT.tentacolo.wing.put(xf(_M[2], M0, -.1, .04, 0, 0, 0, -(f * .85 + .15), -1, 1, 1), m.flash);
+        for (let k = 0; k < 3; k++) KIT.tentacolo.tail.put(xf(_M[3 + k], M0, (k - 1) * .07, -.05, -.08, Math.sin(m.ph * .5 + k) * .25, 0, 0), m.flash);
+      } else if (m.type === 'abominio') {
+        const bob = Math.abs(Math.sin(m.ph)) * 0.06;
+        const M0 = xf(_M[0], null, m.x, m.y + bob, m.z, Math.sin(m.ph) * .04, HPI, Math.cos(m.ph) * .04, 1.15, 1.15, 1.15);
+        KIT.abominio.body.put(M0, m.flash);
+      } else {
+        const bob = Math.abs(Math.sin(m.ph)) * 0.04;
+        const M0 = xf(_M[0], null, m.x, m.y + bob, m.z, 0, HPI, 0, 1, 1 + Math.sin(m.ph) * 0.08, 1);
+        KIT.polipetto.body.put(M0, m.flash);
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU + 0.52, w = Math.sin(m.ph + k * 1.35);
+          KIT.polipetto.tentacle.put(xf(_M[1 + k], M0, Math.cos(a) * 0.13, 0.06, -Math.sin(a) * 0.13, 0, a + w * 0.2, 0.12 + w * 0.3), m.flash);
+        }
+      }
+    }
+
+    const T = FIRE_TIERS[fireLvl];
+    cat.scaleCur = damp(cat.scaleCur, T.scale, 10, dt);
+    cat.mutatePuff = Math.max(0, cat.mutatePuff - dt * 2.8);
+
+    // Luce fuoco dinamica sul plinto
+    fireGlowLight.intensity = fireLvl > 0 ? (0.7 + fireLvl * 0.45 + Math.sin(SH.uTime.value * 9) * 0.2) : 0;
+
+    // Bersaglio Solo TERRA (regola FIRST)
+    let tgt = null, bestX = -1e9;
+    for (const m of mons) {
+      if (m.fly) continue;
+      if (m.x * m.x + m.z * m.z <= T.range * T.range && m.x > bestX) { bestX = m.x; tgt = m; }
+    }
+
+    // Passerella telescopica attiva solo a 0 DNA (Gatto Graffiatore); da 1 DNA Fuoco il gatto lancia palle di fuoco dal plinto
+    if (fireLvl === 0 && tgt) cat.holdT = 1.2;
+    else cat.holdT = fireLvl > 0 ? 0 : Math.max(0, cat.holdT - dt);
+
+    const wantExt = (fireLvl === 0 && cat.holdT > 0) ? 1 : 0;
+    cat.ext = damp(cat.ext, wantExt, wantExt ? 12 : 6, dt);
+    gantryRail.visible = cat.ext > 0.02;
+    gantryRail.scale.z = Math.max(0.01, cat.ext);
+    gantryPad.position.z = cat.ext * REACH;
+
+    const catX = 0, catY = GANTRY_H + 0.08, catZ = cat.ext * REACH;
+    cat.swipe = Math.max(0, cat.swipe - dt * 4.5);
+    cat.cool -= dt;
+
+    if (tgt) {
+      const dx = tgt.x - catX, dz = tgt.z - catZ;
+      cat.yaw = angDamp(cat.yaw, Math.atan2(dx, dz), 14, dt);
+      cat.pitch = damp(cat.pitch, 0.12, 8, dt);
+      cat.hitDist = Math.max(0.35, Math.hypot(dx, dz));
+      cat.hitDy = (tgt.y + tgt.hitH) - catY;
+
+      const ready = fireLvl > 0 || cat.ext > 0.75;
+      if (cat.cool <= 0 && ready) {
+        cat.cool = 1 / T.rate;
+        cat.swipe = 1;
+        cat.pawSide *= -1;
+
+        if (fireLvl === 0) {
+          tgt.flash = 1;
+          tgt.hp -= T.dmg;
+          spawnClawSlashes(tgt.x, tgt.y + tgt.hitH, tgt.z, cat.yaw, cat.pawSide);
+        } else {
+          // Proiettile balistico di fuoco (10 u/s da GDD 3.0)
+          const sx = catX + Math.sin(cat.yaw) * 0.45 * cat.scaleCur;
+          const sy = catY + 0.65 * cat.scaleCur;
+          const sz = catZ + Math.cos(cat.yaw) * 0.45 * cat.scaleCur;
+          const dist = Math.hypot(tgt.x - sx, tgt.z - sz);
+          const flightT = clamp(dist / 10.0, 0.14, 0.65);
+          fireballs.push({
+            x0: sx, y0: sy, z0: sz,
+            tx: tgt.x + tgt.spd * flightT * 0.65, ty: tgt.y + tgt.hitH, tz: tgt.z,
+            t: 0, T: flightT, arc: 0.65 + dist * 0.14,
+            dmg: T.dmg, splash: T.splash, lvl: fireLvl
+          });
+        }
+      }
+    } else {
+      cat.yaw = angDamp(cat.yaw, Math.sin(SH.uTime.value * 0.7) * 0.55, 2.4, dt);
+      cat.pitch = damp(cat.pitch, Math.sin(SH.uTime.value * 1.2) * 0.06, 4, dt);
+      if (cat.cool < 0.12) cat.cool = 0.12;
+    }
+
+    rigCat({
+      x: catX, y: catY, z: catZ, yaw: cat.yaw, pitch: cat.pitch,
+      scale: cat.scaleCur, swipe: cat.swipe, pawSide: cat.pawSide,
+      hitDist: cat.hitDist, hitDy: cat.hitDy, mutatePuff: cat.mutatePuff
+    }, fireLvl);
+
+    // Proiettili Fuoco -> Impatto RadialSplash
+    for (let i = fireballs.length - 1; i >= 0; i--) {
+      const fb = fireballs[i];
+      fb.t += dt;
+      const u = Math.min(1, fb.t / fb.T);
+      const x = lerp(fb.x0, fb.tx, u), z = lerp(fb.z0, fb.tz, u);
+      const y = lerp(fb.y0, fb.ty, u) + fb.arc * 4 * u * (1 - u);
+      const sc = 0.75 + fb.lvl * 0.22;
+      KIT.gattoFuoco.fireball.put(xf(_M[9], null, x, y, z, fb.t * 8, fb.t * 6, 0, sc, sc, sc), 0, null);
+
+      if (u >= 1) {
+        fireballs.splice(i, 1);
+        spawnExplosion(fb.tx, 0.04, fb.tz, fb.splash, fb.lvl);
+        for (const m of mons) {
+          if (m.fly || m.hp <= 0) continue;
+          if (Math.hypot(m.x - fb.tx, m.z - fb.tz) <= fb.splash + m.rad) {
+            m.hp -= fb.dmg;
+            m.flash = 1;
+          }
+        }
+      }
+    }
+
+    // Aggiorna esplosioni, scintille e scie
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const ex = explosions[i];
+      ex.life -= dt;
+      if (ex.life <= 0) {
+        scene.remove(ex.ball); ex.ball.geometry.dispose(); ex.ball.material.dispose();
+        if (ex.ring) { scene.remove(ex.ring); ex.ring.geometry.dispose(); ex.ring.material.dispose(); }
+        explosions.splice(i, 1);
+      } else {
+        const p = 1 - ex.life / ex.max;
+        ex.ball.scale.setScalar(0.5 + p * 1.45);
+        ex.ball.material.opacity = (1 - p) * 0.85;
+        if (ex.ring) ex.ring.material.opacity = (1 - p) * 0.8;
+      }
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const sp = sparks[i];
+      sp.life -= dt;
+      if (sp.life <= 0) { scene.remove(sp.mesh); sp.mesh.geometry.dispose(); sp.mesh.material.dispose(); sparks.splice(i, 1); }
+      else {
+        sp.vy -= 11 * dt;
+        sp.mesh.position.x += sp.vx * dt; sp.mesh.position.y = Math.max(0.05, sp.mesh.position.y + sp.vy * dt); sp.mesh.position.z += sp.vz * dt;
+        sp.mesh.scale.setScalar(Math.min(1, sp.life * 3));
+      }
+    }
+    for (let i = slashes.length - 1; i >= 0; i--) {
+      const s = slashes[i];
+      s.life -= dt;
+      if (s.life <= 0) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); slashes.splice(i, 1); }
+      else { s.mesh.material.opacity = s.life / s.max; s.mesh.scale.setScalar(0.7 + 0.5 * (1 - s.life / s.max)); }
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>

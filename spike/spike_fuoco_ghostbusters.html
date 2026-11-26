@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Spike Gatto Fuoco (Proposta C — Ghostbusters)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0f151c; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    #ui {
+      position: fixed; top: 14px; left: 14px; width: 320px; z-index: 20;
+      background: rgba(16, 22, 30, 0.93); border: 1px solid #3f2b22;
+      border-radius: 10px; padding: 14px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    }
+    h1 { font-size: 14.5px; margin-bottom: 6px; color: #ff944d; }
+    .sub { font-size: 11.5px; color: #93a4b8; margin-bottom: 10px; line-height: 1.35; }
+    .slots-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0b1017; border: 1px solid #283445; border-radius: 6px;
+      padding: 7px 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .slots { display: flex; gap: 5px; }
+    .slot {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 1px solid #48566a; background: #161e29; transition: 0.2s;
+    }
+    .slot.fire {
+      background: radial-gradient(circle at 35% 35%, #ffe066, #ff4500 70%, #8a1500);
+      border-color: #ffad5c; box-shadow: 0 0 8px rgba(255, 90, 20, 0.75);
+    }
+    .row { margin-bottom: 9px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #9fb0c4; margin-bottom: 3px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #ff6b2b; cursor: pointer; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+    button {
+      background: #222e3f; color: #fff; border: 1px solid #36475e;
+      border-radius: 6px; padding: 7px 8px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: #2f4057; }
+    button.fire {
+      background: linear-gradient(135deg, #c93814, #e8621c);
+      border-color: #ff9c54; grid-column: span 2; padding: 8px; font-size: 12.5px;
+    }
+    button.fire:hover { background: linear-gradient(135deg, #e0441c, #ff762b); }
+    button.active { background: #2b6cb0; border-color: #63b3ed; }
+    .hint { font-size: 10.5px; color: #6e8199; margin-top: 8px; border-top: 1px solid #243040; padding-top: 7px; line-height: 1.4; }
+
+    #labels { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+    .tag {
+      position: absolute; transform: translate(-50%, -100%);
+      background: rgba(13, 19, 27, 0.88); border: 1px solid #3c4d63;
+      border-radius: 8px; padding: 5px 10px; text-align: center; white-space: nowrap;
+    }
+    .tag.base { border-color: #e8893c; }
+    .tag.fire { border-color: #ff5e26; }
+    .tag .t { font-size: 12px; font-weight: 700; }
+    .tag.base .t { color: #ffbe78; }
+    .tag.fire .t { color: #ff8c52; }
+    .tag .d { font-size: 10.5px; color: #9fb0c4; margin-top: 1px; }
+
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content;
+      background: #1c2430; border: 1px solid #e5534b; border-radius: 10px; padding: 20px; z-index: 30;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0d1117; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>🔥 Proposta C — Piro-Tecnico (Ghostbusters)</h1>
+    <div class="sub">Fusto pressurizzato sulle spalle collegato con <b>tubo corrugato</b> alla lancia lanciafiamme.</div>
+
+    <div class="slots-bar">
+      <strong id="lblForm" style="color:#ff9c54;">1 DNA — Gatto Fuoco</strong>
+      <div class="slots" id="dnaSlots">
+        <div class="slot fire"></div><div class="slot"></div><div class="slot"></div><div class="slot"></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Evoluzione DNA: <span id="lblLvl">1 DNA (Fusto + 1 Tubo)</span></label>
+      <input id="rngLvl" type="range" min="1" max="4" step="1" value="1" />
+    </div>
+
+    <div class="btns">
+      <button id="btnAttack" class="fire">🔥 Spara Palla di Fuoco [Spazio]</button>
+      <button id="btnTurn" class="active">Ruota 360°: ON</button>
+      <button id="btnIso">Vista Gioco (Iso)</button>
+      <button id="btnClose">Primo Piano Tubo</button>
+      <button id="btnBoth" class="active">Confronto Base</button>
+    </div>
+
+    <div class="hint">
+      <b>Lv 1–2:</b> 1 fusto + 1 tubo corrugato → lancia destra.<br>
+      <b>Lv 3–4:</b> Doppio fusto + <b>doppio tubo</b> → doppia lancia (Gatto Vulcano al Lv 4 con sfiatatoi fiamma).<br>
+      <b>Mouse:</b> Trascina SX ruota • Rotella zoom • Trascina DX sposta.
+    </div>
+  </div>
+
+  <div id="labels"></div>
+
+  <div id="err">
+    <strong style="color:#ff7b72;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startSpike(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startSpike() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startSpike() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+
+  const COL = {
+    iron: C(0x4b5563), steel: C(0x8896a6), stoneD: C(0x2d3540),
+    black: [0.06, 0.07, 0.09], gold: C(0xf5c242)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f151c);
+  scene.fog = new THREE.FogExp2(0x0f151c, 0.025);
+
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 120);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  const camGoal = { theta: 0.42, phi: 1.02, dist: 6.4, tx: 0.2, ty: 0.95, tz: 0.0 };
+  const camCur  = { ...camGoal };
+  function applyCamera() {
+    const h = camCur.dist * Math.sin(camCur.phi);
+    camera.position.set(
+      camCur.tx + h * Math.sin(camCur.theta),
+      camCur.ty + camCur.dist * Math.cos(camCur.phi),
+      camCur.tz + h * Math.cos(camCur.theta)
+    );
+    camera.lookAt(camCur.tx, camCur.ty, camCur.tz);
+  }
+  applyCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camGoal.theta -= dx * 0.008;
+      camGoal.phi = clamp(camGoal.phi - dy * 0.008, 0.12, HPI - 0.05);
+    } else {
+      const pan = camGoal.dist * 0.0018;
+      camGoal.tx -= (Math.cos(camGoal.theta) * dx + Math.sin(camGoal.theta) * dy) * pan;
+      camGoal.tz -= (-Math.sin(camGoal.theta) * dx + Math.cos(camGoal.theta) * dy) * pan;
+    }
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camGoal.dist = clamp(camGoal.dist * (e.deltaY > 0 ? 1.1 : 0.91), 2.4, 18);
+  }, { passive: false });
+
+  // Luci
+  scene.add(new THREE.HemisphereLight(0xaad0f2, 0x1d2530, 1.15));
+  const dirLight = new THREE.DirectionalLight(0xfff4e2, 1.35);
+  dirLight.position.set(5, 11, 7);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const fireFill = new THREE.PointLight(0xff6b2b, 1.2, 12);
+  fireFill.position.set(1.6, 2.2, 2.2);
+  scene.add(fireFill);
+
+  // Pavimento
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(28, 24), new THREE.MeshStandardMaterial({ color: 0x1c242f, roughness: 0.75 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+    const grid = new THREE.GridHelper(28, 28, 0x334154, 0x18202a);
+    grid.position.y = 0.005;
+    scene.add(grid);
+  }
+
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const boost = 1 + (o.emis || 0) * 1.45;
+      this.items.push({ g, c: [Math.min(1, c[0] * boost), Math.min(1, c[1] * boost), Math.min(1, c[2] * boost)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 8), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 8, o.h || 6), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    // Tubo corrugato in stile Ghostbusters lungo una serie di punti 3D
+    hose(pts, r, colTube, colRing, colGlow = null) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        this.seg(a, b, r, r, colTube, { n: 7 });
+        // Anelli corrugati a metà segmento e giunzioni
+        const mx = (a[0] + b[0]) * 0.5, my = (a[1] + b[1]) * 0.5, mz = (a[2] + b[2]) * 0.5;
+        const useGlow = colGlow && (i % 2 === 1);
+        this.sph(r * 1.24, mx, my, mz, useGlow ? colGlow : colRing, { w: 6, h: 5, emis: useGlow ? 0.85 : 0 });
+        if (i > 0) this.sph(r * 1.15, a[0], a[1], a[2], colTube, { w: 6, h: 5 });
+      }
+    }
+    build() {
+      let total = 0;
+      for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) {
+          col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2];
+        }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.48, metalness: 0.14 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S);
+      this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1));
+      m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat) { if (this.n < this.cap) this.mesh.setMatrixAt(this.n++, mat); }
+    end() {
+      this.mesh.count = this.n;
+      this.mesh.visible = this.n > 0;
+      if (this.n) this.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  // Due piedistalli affiancati: Base (SX) vs Proposta C Ghostbusters (DX)
+  const SPOTS = [
+    { id: 'base', x: -1.7, y: 0.34, z: 0.0, title: 'GATTO BASE (0 DNA)', desc: 'Riferimento — Graffiatore', kind: 'base' },
+    { id: 'fire', x:  1.5, y: 0.34, z: 0.0, title: 'PROPOSTA C — Piro-Tecnico', desc: 'Fusto + Tubo Ghostbusters + Lanciafiamme', kind: 'fire' },
+  ];
+
+  for (const sp of SPOTS) {
+    const S = new Soup();
+    const H = sp.y, R = sp.kind === 'base' ? 0.98 : 1.15;
+    S.cyl(R + .14, .14, 0, .07, 0, COL.stoneD, { n: 14 });
+    S.cyl(R, H, 0, H / 2, 0, COL.iron, { n: 14, rt: .93 });
+    S.add(gTorus(20, .045, 6), { s: R * .92, p: [0, H + .01, 0], r: [HPI, 0, 0], c: sp.kind === 'base' ? C(0xe8893c) : C(0xff4d1a), emis: .55 });
+    const mesh = new THREE.Mesh(S.build(), MAT_INST);
+    mesh.position.set(sp.x, 0, sp.z);
+    mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
+
+  const labelsRoot = document.getElementById('labels');
+  const labelEls = SPOTS.map(sp => {
+    const el = document.createElement('div');
+    el.className = 'tag ' + sp.kind;
+    el.innerHTML = `<div class="t">${sp.title}</div><div class="d">${sp.desc}</div>`;
+    labelsRoot.appendChild(el);
+    return { sp, el };
+  });
+
+  // Modelli
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    // Gatto Base
+    KIT.base = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+        for (const cx of [-.055, 0, .055]) S.cone(.016, .085, cx, -.28, .31, [1, 1, 1], { n: 4, r: [HPI + .15, 0, 0], emis: .25 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .8, -.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA C — PIRO-TECNICO CON TUBO GHOSTBUSTERS
+    const techOrange = C(0xee6a24), brass = C(0xd99b26), tankRed = C(0xc4281c), glassCyan = C(0x66e8ff);
+    const steelD = C(0x3a4554), hoseDark = C(0x1f252e), warnY = C(0xf2b724), fGold = C(0xffa824), fCore = C(0xfff08a), lava = C(0xff4c12);
+
+    KIT.fire = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, techOrange, { sc: [1.06, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, techOrange, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+          // Spallacci imbragatura zaino Ghostbusters (passano sopra le spalle fino al petto)
+          S.seg([s * .16, .72, -.22], [s * .18, .72, .16], .042, .042, steelD, { n: 5 });
+          S.seg([s * .18, .72, .16], [s * .14, .44, .27], .038, .038, steelD, { n: 5 });
+        }
+        // Fibbia/manometro centrale sul petto
+        S.box(.26, .08, .06, 0, .56, .27, steelD);
+        S.cyl(.072, .05, 0, .56, .30, brass, { n: 8, r: [HPI, 0, 0] });
+        S.cyl(.045, .06, 0, .56, .31, fCore, { n: 8, r: [HPI, 0, 0], emis: .9 });
+      }, 2),
+
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, techOrange, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        S.add(gTorus(16, .08, 5), { s: .37, p: [0, .40, .02], r: [HPI, 0, 0], c: steelD });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.14, .31, s * .21, .56, 0, techOrange, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.cyl(.105, .08, s * .14, .44, .32, brass, { n: 10, r: [HPI - .25, 0, 0] });
+          S.cyl(.075, .09, s * .14, .44, .33, glassCyan, { n: 10, r: [HPI - .25, 0, 0], emis: .7 });
+        }
+      }, 2),
+
+      // Zampa libera (usata a sinistra per Lv 1-2)
+      pawFree: new PartBatch(S => {
+        S.cyl(.092, .36, 0, -.14, .08, techOrange, { n: 8, r: [.45, 0, 0] });
+        S.sph(.112, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+      }, 2, { shadow: false }),
+
+      // Zampa con Lancia Lanciafiamme stile Neutrona Wand (con raccordo posteriore per il tubo!)
+      pawWand: new PartBatch(S => {
+        S.cyl(.092, .34, 0, -.13, .06, techOrange, { n: 8, r: [.42, 0, 0] });
+        S.sph(.108, 0, -.25, .15, steelD, { sc: [1.1, .85, 1.1], w: 7, h: 5 }); // guanto protettivo
+        // Corpo lanciafiamme
+        S.cyl(.068, .18, 0, -.25, .08, brass, { n: 8, r: [HPI, 0, 0] });      // raccordo ingresso tubo (dietro la zampa)
+        S.cyl(.082, .36, 0, -.25, .28, steelD, { n: 8, r: [HPI, 0, 0] });     // canna principale
+        S.box(.04, .06, .16, 0, -.18, .26, warnY);                             // striscia warning gialla
+        S.cyl(.105, .10, 0, -.25, .48, brass, { n: 8, r: [HPI, 0, 0] });      // ugello svasato anteriore
+        S.cyl(.072, .05, 0, -.25, .54, fCore, { n: 8, r: [HPI, 0, 0], emis: 1.0 }); // bocca accesa
+        // Fiammella pilota sotto l'ugello
+        S.cone(.045, .14, 0, -.17, .55, fGold, { n: 4, r: [.3, 0, 0], emis: .95 });
+      }, 4, { shadow: false }),
+
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, techOrange, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, techOrange, { n: 5 });
+        S.sph(.055, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+
+      // FUSTO SINGOLO + TUBO CORRUGATO DESTRO (Lv 1-2)
+      pack1: new PartBatch(S => {
+        // Piastra telaio Proton-Pack sulla schiena
+        S.box(.34, .48, .08, 0, .52, -.26, steelD);
+        // Fusto cilindrico rosso pressurizzato
+        S.cyl(.16, .50, 0, .54, -.39, tankRed, { n: 12 });
+        S.cyl(.172, .06, 0, .77, -.39, brass, { n: 12 });
+        S.cyl(.172, .06, 0, .31, -.39, steelD, { n: 12 });
+        // Finestrella livello carburante lavico sul fusto
+        S.box(.08, .22, .05, 0, .54, -.54, lava, { emis: .85 });
+        // Valvola superiore + fiammella sfiatatoio
+        S.cyl(.075, .10, 0, .84, -.39, steelD, { n: 8 });
+        S.cone(.06, .16, 0, .96, -.39, fGold, { n: 5, emis: .85 });
+        // Raccordo uscita laterale destro del fusto
+        S.cyl(.058, .12, .16, .35, -.39, brass, { n: 8, r: [0, 0, HPI] });
+        // TUBO CORRUGATO GHOSTBUSTERS: dal fusto sul fianco destro -> curva ampia -> entra dietro la lancia destra!
+        S.hose([
+          [.20, .35, -.39],
+          [.38, .31, -.34],
+          [.48, .26, -.18],
+          [.47, .24,  .02],
+          [.36, .26,  .16],
+          [.21, .29,  .22],
+        ], .042, hoseDark, warnY);
+      }, 2),
+
+      // DOPPIO FUSTO + DOPPIO TUBO CORRUGATO (Lv 3-4 — Gatto Vulcano al Lv 4)
+      pack2: new PartBatch(S => {
+        S.box(.54, .54, .10, 0, .54, -.26, steelD);
+        // Raccordo centrale ciclotrone tra i due fusti
+        S.cyl(.11, .14, 0, .54, -.38, brass, { n: 10, r: [HPI, 0, 0] });
+        S.sph(.075, 0, .54, -.46, fCore, { w: 6, h: 5, emis: 1.0 });
+
+        for (const s of [-1, 1]) {
+          // Fusto sinistro e destro
+          S.cyl(.155, .56, s * .20, .56, -.40, tankRed, { n: 12 });
+          S.cyl(.17, .065, s * .20, .82, -.40, brass, { n: 12 });
+          S.cyl(.17, .065, s * .20, .30, -.40, steelD, { n: 12 });
+          S.box(.07, .24, .05, s * .20, .56, -.55, lava, { emis: .9 });
+          S.cyl(.07, .12, s * .20, .90, -.40, steelD, { n: 8 });
+          // Raccordo uscita laterale
+          S.cyl(.058, .12, s * .34, .34, -.40, brass, { n: 8, r: [0, 0, HPI] });
+          // DOPPIO TUBO CORRUGATO (sinistro e destro) con anelli caldi incandescenti!
+          S.hose([
+            [s * .37, .34, -.40],
+            [s * .50, .29, -.30],
+            [s * .54, .25, -.12],
+            [s * .48, .24,  .06],
+            [s * .36, .27,  .17],
+            [s * .21, .29,  .22],
+          ], .045, hoseDark, warnY, lava);
+        }
+      }, 2),
+
+      // Fiamme sfiatatoi potenziate sul doppio fusto (Lv 4 — Gatto Vulcano)
+      volcanoVents: new PartBatch(S => {
+        for (const s of [-1, 1]) {
+          S.cone(.11, .34, s * .20, 1.12, -.40, fGold, { n: 5, emis: .95 });
+          S.sph(.075, s * .20, .99, -.40, fCore, { w: 6, h: 5, emis: 1.0 });
+        }
+      }, 2, { shadow: false }),
+    };
+
+    KIT.fireball = new PartBatch(S => {
+      S.sph(.18, 0, 0, 0, lava, { w: 8, h: 6, emis: .9 });
+      S.sph(.11, 0, 0, .05, fCore, { w: 6, h: 5, emis: 1.0 });
+    }, 20, { shadow: false });
+  }
+
+  function rigBase(x, y, z, yaw, scale, atk) {
+    const K = KIT.base, t = SH.uTime.value * 3.0, lunge = Math.sin(atk * PI);
+    const sq = 1 + Math.sin(t) * .025 - lunge * .08, sx = 1 / Math.sqrt(sq);
+    const M0 = xf(_M[0], null, x, y, z, lunge * .25, yaw, 0, scale * sx, scale * sq, scale * sx);
+    K.body.put(M0);
+    K.head.put(xf(_M[1], M0, 0, .78, .05, -lunge * .2, 0, Math.sin(t * .7) * .06));
+    for (const side of [-1, 1]) {
+      const a = side === 1 ? lunge : 0;
+      K.paw.put(xf(_M[2 + (side > 0 ? 1 : 0)], M0, side * .18, .54, .18 + a * .32, -a * 1.1, side * -a * .3, side * a * .22));
+    }
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.6) * .45, Math.cos(t * 1.6) * .12));
+  }
+
+  function rigFireC(x, y, z, yaw, scale, atk, lvl) {
+    const K = KIT.fire, t = SH.uTime.value * 3.6, recoil = Math.sin(atk * PI);
+    const sq = 1 + Math.sin(t) * .028 - recoil * .07, sx = 1 / Math.sqrt(sq);
+    const M0 = xf(_M[0], null, x, y, z, -recoil * .16, yaw, 0, scale * sx, scale * sq, scale * sx);
+    K.body.put(M0);
+    K.head.put(xf(_M[1], M0, 0, .78, .05, recoil * .14, 0, Math.sin(t * .7) * .05));
+
+    const dual = lvl >= 3;
+    // Zampa destra: sempre con Lancia Lanciafiamme (rinculo contenuto così resta agganciata al tubo)
+    K.pawWand.put(xf(_M[2], M0, .20, .54, .18 - recoil * .08, -recoil * .18, 0, 0));
+    // Zampa sinistra: libera a Lv 1-2, seconda Lancia a Lv 3-4!
+    if (dual) {
+      K.pawWand.put(xf(_M[3], M0, -.20, .54, .18 - recoil * .08, -recoil * .18, 0, 0));
+    } else {
+      K.pawFree.put(xf(_M[3], M0, -.19, .54, .18, -recoil * .35, .15, -.12));
+    }
+
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.7) * .45, Math.cos(t * 1.7) * .12));
+
+    if (dual) {
+      K.pack2.put(M0);
+      if (lvl >= 4) K.volcanoVents.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1 + Math.sin(t * 5) * .14, 1));
+    } else {
+      K.pack1.put(M0);
+    }
+  }
+
+  initModels();
+
+  const LVL_INFO = [
+    '',
+    ['1 DNA — Gatto Fuoco',   '1 DNA (1 Fusto + 1 Tubo)'],
+    ['2 DNA — Gatto Fuoco',   '2 DNA (Paffuto + 1 Tubo)'],
+    ['3 DNA — Gatto Fuoco',   '3 DNA (2 Fusti + 2 Tubi)'],
+    ['4 DNA — Gatto Vulcano', '4 DNA (Chonker + 2 Lance)']
+  ];
+  const SCALES = [0.86, 1.00, 1.15, 1.32, 1.50];
+  let dnaLvl = 1, turntable = true, spinAngle = 0, atkTimer = 0;
+  const shots = [];
+
+  function updateUI() {
+    document.getElementById('lblForm').textContent = LVL_INFO[dnaLvl][0];
+    document.getElementById('lblLvl').textContent  = LVL_INFO[dnaLvl][1];
+    const slots = document.getElementById('dnaSlots').children;
+    for (let i = 0; i < 4; i++) slots[i].classList.toggle('fire', i < dnaLvl);
+  }
+
+  function triggerAttack() {
+    atkTimer = 1.0;
+    const yaw = turntable ? spinAngle : 0;
+    const cs = Math.cos(yaw), sn = Math.sin(yaw), sc = SCALES[dnaLvl];
+    const sides = dnaLvl >= 3 ? [-1, 1] : [1];
+    for (const side of sides) {
+      const lx = side * 0.20 * sc, lz = 0.72 * sc;
+      const sx = SPOTS[1].x + lx * cs + lz * sn;
+      const sz = SPOTS[1].z - lx * sn + lz * cs;
+      shots.push({
+        x: sx, y: SPOTS[1].y + 0.34 * sc, z: sz,
+        vx: sn * 5.6, vy: 1.5, vz: cs * 5.6,
+        life: 0.55, sc: 0.72 + dnaLvl * 0.16
+      });
+    }
+  }
+
+  document.getElementById('rngLvl').oninput = e => { dnaLvl = +e.target.value; updateUI(); };
+  document.getElementById('btnAttack').onclick = triggerAttack;
+
+  const btnTurn = document.getElementById('btnTurn');
+  btnTurn.onclick = () => {
+    turntable = !turntable;
+    btnTurn.textContent = 'Ruota 360°: ' + (turntable ? 'ON' : 'OFF');
+    btnTurn.classList.toggle('active', turntable);
+    if (!turntable) spinAngle = 0;
+  };
+
+  const camBtns = ['btnBoth', 'btnIso', 'btnClose'];
+  function setCam(id, tx, ty, tz, dist, phi, theta) {
+    camGoal.tx = tx; camGoal.ty = ty; camGoal.tz = tz;
+    camGoal.dist = dist; camGoal.phi = phi; camGoal.theta = theta;
+    for (const b of camBtns) document.getElementById(b).classList.toggle('active', b === id);
+  }
+  document.getElementById('btnBoth').onclick  = () => setCam('btnBoth',  0.0, 0.95, 0.0, 6.4, 1.02, 0.42);
+  document.getElementById('btnIso').onclick   = () => setCam('btnIso',   1.5, 0.85, 0.0, 6.2, 0.78, 0.78);
+  document.getElementById('btnClose').onclick = () => setCam('btnClose', 1.5, 0.95, 0.0, 3.6, 1.15, 1.25);
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); triggerAttack(); } });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  updateUI();
+
+  const projV = new THREE.Vector3();
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    SH.uTime.value += dt;
+
+    for (const k of ['theta', 'phi', 'dist', 'tx', 'ty', 'tz']) camCur[k] = damp(camCur[k], camGoal[k], 8, dt);
+    applyCamera();
+
+    if (turntable) spinAngle += dt * 0.55;
+    atkTimer = Math.max(0, atkTimer - dt * 2.4);
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    const yaw = turntable ? spinAngle : 0;
+    rigBase(SPOTS[0].x, SPOTS[0].y + 0.04, SPOTS[0].z, yaw, SCALES[0], atkTimer);
+    rigFireC(SPOTS[1].x, SPOTS[1].y + 0.04, SPOTS[1].z, yaw, SCALES[dnaLvl], atkTimer, dnaLvl);
+
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const sh = shots[i];
+      sh.life -= dt;
+      sh.vy -= 7.5 * dt;
+      sh.x += sh.vx * dt; sh.y = Math.max(0.15, sh.y + sh.vy * dt); sh.z += sh.vz * dt;
+      if (sh.life <= 0) { shots.splice(i, 1); continue; }
+      const s = sh.sc * Math.min(1, sh.life * 4);
+      KIT.fireball.put(xf(_M[8], null, sh.x, sh.y, sh.z, sh.life * 9, sh.life * 6, 0, s, s, s));
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+
+    for (const { sp, el } of labelEls) {
+      const sc = sp.kind === 'base' ? SCALES[0] : SCALES[dnaLvl];
+      projV.set(sp.x, sp.y + 1.55 * sc + 0.35, sp.z).project(camera);
+      if (projV.z > 1) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + 'px';
+      el.style.top  = ((-projV.y * 0.5 + 0.5) * innerHeight) + 'px';
+    }
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>

@@ -593,7 +593,7 @@ const UI = (() => {
   function toggleCommand() { U.setManual(!U.manual); U.idle = 0; sfx('uiClick', CAM.x, CAM.z, .8); }
   function deny() { U.deny = 1; sfx('uiDeny', CAM.x, CAM.z, .6); buzz([18, 40, 18]); }
   function doBuild(pad, kind) { touchInput(); if (buildTower(pad, kind, true)) { sfx('uiClick', pad.x, pad.z, .8); buzz(12); U.menu = null; U.armed = null; return true; } deny(); return false; }
-  function doUpgrade(t) { if (upgradeTower(t, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); U.menu = null; return true; } deny(); return false; }
+  function doUpgrade(t) { if (upgradeTower(t, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); if (t.kind !== 'archer' || t.lvl >= (t.def.maxLvl ?? 2)) U.menu = null; return true; } deny(); return false; }
   function doSell(t) { if (sellTower(t)) { U.menu = null; return true; } return false; }
   function pickKind(kind) {
     touchInput();
@@ -821,18 +821,26 @@ const UI = (() => {
         text(ls[0], px + mp, ty, lit || fk ? COLR.tx : COLR.dim); text(ls[1], px + mp, ty + LH + s, COLR.dim); if (ls[2]) text(ls[2], px + mp, ty + LH * 2 + s, COLR.dim);
         if (tch && m.sel) { const can = G.gold >= TOWER[m.sel].cost[0]; text(can ? 'Tap again to build' : 'Not enough gold yet', px + mp, ty + LH * 3 + 2 * s, can ? COLR.amber : COLR.red); }
       } else {
-        const t = m.tower, d = t.def, maxed = t.lvl >= 2, upc = maxed ? 0 : d.cost[t.lvl + 1], can = !maxed && G.gold >= upc && t.state === 'active', refund = Math.round(t.spent * .6), L1 = t.lvl + 1;
-        const ul = maxed ? 'Max level' : 'Upgrade ' + upc, sl = m.sellArm ? 'Confirm +' + refund : 'Sell +' + refund, iw9 = 9 * s, bw3 = Math.max(tw(ul), tw(sl), tw('Confirm +' + refund)) + iw9 + 11 * s, bh = (tch ? 24 : 15) * s, by0 = Math.round((bh - LH) / 2);
-        const st = t.kind === 'guard' ? d.n[t.lvl] + ' footmen · ' + d.hp[t.lvl] + ' health' : 'Range ' + d.range[t.lvl].toFixed(1) + ' · Damage ' + d.dmg[t.lvl];
-        const nx = maxed ? t.kills + ' kills' : (t.kind === 'guard' ? 'Next: ' + d.n[L1] + ' footmen · ' + d.hp[L1] + ' health' : 'Next: range ' + d.range[L1].toFixed(1) + ' · damage ' + d.dmg[L1]);
-        const wP = Math.max(bw3 * 2 + 3 * s, tw(d.name) + 26 * s, tw(st), tw(nx)) + mp * 2, hP = mp * 2 + LH * 3 + 6 * s + bh, [px, py] = place(wP, hP);
+        const t = m.tower, d = t.def, maxL = d.maxLvl ?? 2, maxed = t.lvl >= maxL, upc = maxed ? 0 : d.cost[t.lvl + 1], can = !maxed && G.gold >= upc && t.state === 'active', refund = Math.round(t.spent * .6), L1 = t.lvl + 1;
+        const isCat = t.kind === 'archer';
+        const tName = (d.names && d.names[t.lvl]) || d.name;
+        const ul = isCat ? (maxed ? 'Max DNA' : (t.lvl === 0 ? 'Fuoco ' + upc : '+Fuoco ' + upc)) : (maxed ? 'Max level' : 'Upgrade ' + upc);
+        const sl = m.sellArm ? 'Confirm +' + refund : 'Sell +' + refund, iw9 = 9 * s, bw3 = Math.max(tw(ul), tw(sl), tw('Confirm +' + refund)) + iw9 + 11 * s, bh = (tch ? 24 : 15) * s, by0 = Math.round((bh - LH) / 2);
+        const st = isCat
+          ? (t.lvl === 0 ? '0 DNA · Range ' + d.range[0].toFixed(1) + ' · Dmg ' + d.dmg[0] : t.lvl + '/4 DNA · Dmg ' + d.dmg[t.lvl] + ' · Splash ' + d.splash[t.lvl].toFixed(1))
+          : (t.kind === 'guard' ? d.n[t.lvl] + ' footmen · ' + d.hp[t.lvl] + ' health' : 'Range ' + d.range[t.lvl].toFixed(1) + ' · Damage ' + d.dmg[t.lvl]);
+        const nx = maxed
+          ? t.kills + ' kills'
+          : (isCat ? 'Next: ' + d.names[L1] + ' · Dmg ' + d.dmg[L1] + ' · Splash ' + d.splash[L1].toFixed(1) : (t.kind === 'guard' ? 'Next: ' + d.n[L1] + ' footmen · ' + d.hp[L1] + ' health' : 'Next: range ' + d.range[L1].toFixed(1) + ' · damage ' + d.dmg[L1]));
+        const pips = isCat ? maxL : 3;
+        const wP = Math.max(bw3 * 2 + 3 * s, tw(tName) + (pips * 6 + 8) * s, tw(st), tw(nx)) + mp * 2, hP = mp * 2 + LH * 3 + 6 * s + bh, [px, py] = place(wP, hP);
         U.menuRect = { x: px, y: py, w: wP, h: hP };
-        plate(px, py, wP, hP); text(d.name, px + mp, py + mp - s, COLR.amber);
-        for (let i = 0; i < 3; i++) PX.icon(c, i <= t.lvl ? 'star' : 'starEmpty', px + wP - mp - (3 - i) * 6 * s, py + mp, s);
+        plate(px, py, wP, hP); text(tName, px + mp, py + mp - s, isCat && t.lvl > 0 ? COLR.ember : COLR.amber);
+        for (let i = 0; i < pips; i++) PX.icon(c, (isCat ? i < t.lvl : i <= t.lvl) ? 'star' : 'starEmpty', px + wP - mp - (pips - i) * 6 * s, py + mp, s);
         text(st, px + mp, py + mp + LH + s, COLR.tx); text(nx, px + mp, py + mp + LH * 2 + 2 * s, maxed ? COLR.dim : COLR.ok);
         const by = py + mp + LH * 3 + 6 * s, bwf = Math.floor((wP - mp * 2 - 3 * s) / 2);
         let r = button(px + mp, by, bwf, bh, 'up', can, () => doUpgrade(t), null, false);
-        PX.icon(c, 'upgrade', px + mp + 4 * s, by + by0 + r.dy, s, can ? 1 : .4); text(ul, px + mp + 4 * s + iw9 + 3 * s, by + by0 + r.dy, can ? COLR.tx : (maxed ? COLR.dim : COLR.red));
+        PX.icon(c, isCat && !maxed ? 'flame' : 'upgrade', px + mp + 4 * s, by + by0 + r.dy, s, can ? 1 : .4); text(ul, px + mp + 4 * s + iw9 + 3 * s, by + by0 + r.dy, can ? COLR.tx : (maxed ? COLR.dim : COLR.red));
         r = button(px + mp + bwf + 3 * s, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, null, m.sellArm);
         PX.icon(c, 'sell', px + mp + bwf + 7 * s, by + by0 + r.dy, s); text(sl, px + mp + bwf + 7 * s + iw9 + 3 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
       }

@@ -5,7 +5,20 @@ const G = {
   towers: [], mons: [], men: [], arrows: [], shells: [], stuck: [], hbars: [], phase: 'play',
 };
 const TOWER = {
-  archer: { name: 'Gatto Graffiatore', short: 'Graffiatore', icon: 'archer', cost: [50, 30, 50], range: [4.4, 4.8, 5.2], dmg: [10, 16, 24], rate: [.67, .6, .52], n: [1, 1, 1], air: false, ground: true, light: [45, 58, 72], desc: ['Graffio rapido a corto raggio.', 'Solo bersagli a terra.'] },
+  archer: {
+    name: 'Gatto Graffiatore', short: 'Graffiatore',
+    names: ['Gatto Graffiatore', 'Gatto Fuoco Lv 1', 'Gatto Fuoco Lv 2', 'Gatto Fuoco Lv 3', 'Gatto Vulcano'],
+    icon: 'archer', maxLvl: 4,
+    cost: [50, 30, 50, 80, 120],
+    range: [4.4, 5.2, 5.8, 6.4, 7.2],
+    dmg: [10, 30, 65, 120, 220],
+    rate: [.67, .67, .5, .4, .286],
+    splash: [0, 1.0, 1.2, 1.5, 2.0],
+    scale: [.86, 1.0, 1.15, 1.32, 1.5],
+    n: [1, 1, 1, 1, 1], air: false, ground: true,
+    light: [45, 55, 65, 75, 90],
+    desc: ['0 DNA: Graffio rapido a terra.', '1-4 DNA: Evoluzione Fuoco (Splash).']
+  },
   bombard: { name: 'Bombard', short: 'Bombard', icon: 'bombard', cost: [120, 130, 190], range: [7.4, 8.0, 8.6], minRange: 2.3, dmg: [36, 60, 98], splash: [1.55, 1.8, 2.1], rate: [2.9, 2.7, 2.5], air: false, ground: true, light: [50, 62, 80], desc: ['Slow shells that burst.', 'Ground targets only.'] },
   spire: { name: 'Storm spire', short: 'Spire', icon: 'spire', cost: [110, 120, 180], range: [5.5, 6.0, 6.5], dmg: [17, 25, 35], jumps: [3, 4, 6], rate: [2.3, 2.1, 1.9], slow: [.36, .42, .48], slowT: [1.3, 1.5, 1.7], air: true, ground: true, light: [16, 20, 26], desc: ['Chain lightning that slows.', 'Can hit flyers.'] },
   guard: { name: 'Guard post', short: 'Guards', icon: 'guard', cost: [80, 90, 150], range: [3.4, 3.7, 4.0], n: [2, 3, 3], hp: [62, 90, 135], dmg: [7, 10, 15], rate: [7, 6, 5], air: false, ground: true, light: [55, 70, 90], desc: ['Footmen who block', 'and duel on the road.'] },
@@ -183,9 +196,10 @@ class Tower {
       this.em.r = 1.0; this.em.g = .82; this.em.b = .55;
       this.makeGantry();
       const p = this.w([0, mt.catY, 0], {});
+      const sc = d.scale[lvl];
       this.cat = {
-        yaw: this.yaw, pitch: 0, swipe: 0, pawSide: 1, cool: .3, hitDist: 1.4, hitDy: .2, ext: 0, holdT: 0,
-        e: { scale: [.86, 1.08, 1.32][lvl], ph: rnd() * 6, swipe: 0, pawSide: 1, pitch: 0, hitDist: 1.4, hitDy: .2, x: p.x, y: p.y, z: p.z, yaw: this.yaw, flash: 0 }
+        yaw: this.yaw, pitch: 0, swipe: 0, pawSide: 1, cool: .3, hitDist: 1.4, hitDy: .2, ext: 0, holdT: 0, scaleCur: sc, mutatePuff: 0,
+        e: { scale: sc, ph: rnd() * 6, swipe: 0, pawSide: 1, pitch: 0, hitDist: 1.4, hitDy: .2, mutatePuff: 0, x: p.x, y: p.y, z: p.z, yaw: this.yaw, flash: 0 }
       };
     }
     if (this.kind === 'bombard') this.makeGun();
@@ -247,7 +261,25 @@ class Tower {
     if (mt.rings) { const S = new Soup(); for (let k = 0; k < 7; k++) { if (k === 3) continue; const a = k / 7 * TAU; S.box(.5, .16, .2, Math.cos(a) * 1.0, 0, Math.sin(a) * 1.0, COL.basaltL, { l: L_ROCK, r: [0, -a + HPI, 0] }); } this.ringG = new THREE.Mesh(S.build(), MAT.world); this.ringG.castShadow = true; this.ringG.position.y = -1.25; this.crystal.add(this.ringG); }
     this.group.add(this.crystal);
   }
-  upgrade() { if (this.lvl >= 2 || this.state !== 'active') return false; this.lvl++; this.spent += this.def.cost[this.lvl]; for (const m of this.men) m.lvlUp = true; this.begin(); return true; }
+  upgrade() {
+    const maxL = this.def.maxLvl ?? 2;
+    if (this.lvl >= maxL || this.state !== 'active') return false;
+    this.lvl++;
+    this.spent += this.def.cost[this.lvl];
+    if (this.kind === 'archer' && this.cat) {
+      this.cat.mutatePuff = 1.0;
+      this.em.I = this.def.light[this.lvl];
+      this.em.r = 1.0; this.em.g = .52; this.em.b = .22;
+      const p = this.w([0, this.mounts.catY + .35, this.cat.ext * this.mounts.reach], _ap);
+      fxSparks(p.x, p.y, p.z, 12 + this.lvl * 4, 4.2, 3.0, 1.4, .3, { size: .06, grav: 4 });
+      fxTimed(5, p.x, p.y, p.z, 1.8 + this.lvl * .25, 1.8 + this.lvl * .25, 3.0, 1.4, .3, .9, .24);
+      sfx('ignite', p.x, p.z, .85, .6 + this.lvl * .1);
+      return true;
+    }
+    for (const m of this.men) m.lvlUp = true;
+    this.begin();
+    return true;
+  }
   sell() {
     this.alive = false; this.em.alive = false; this.em.on = 0; LT.emitters[this.idx] = null; this.pad.tower = null;
     for (let i = 0; i < 14; i++) { _tm.compose(_tv.set(this.x + rr(-.7, .7), this.y + rr(.3, 2.4), this.z + rr(-.7, .7)), _tq.set(rr(-1, 1), rr(-1, 1), rr(-1, 1), 1).normalize(), _ts.set(1, 1, 1)); addDebris(this.kind === 'guard' ? KIT.plank : KIT.rubble, _tm, null, rr(-2, 2), rr(1, 4), rr(-2, 2), rr(3, 9), rr(2, 3.5)); }
@@ -287,12 +319,13 @@ class Tower {
   updArcher(dt, d, lvl) {
     const c = this.cat;
     if (!c) return;
+    const isFire = lvl > 0;
     const tgt = findTarget(this.x, this.z, d.range[lvl], false, true);
 
-    if (tgt) c.holdT = 1.2;
-    else c.holdT = TOWER_STUN ? 0 : Math.max(0, c.holdT - dt);
+    if (!isFire && tgt) c.holdT = 1.2;
+    else c.holdT = (isFire || TOWER_STUN) ? 0 : Math.max(0, c.holdT - dt);
 
-    const wantExt = c.holdT > 0 ? 1 : 0;
+    const wantExt = (!isFire && c.holdT > 0) ? 1 : 0;
     c.ext = damp(c.ext, wantExt, wantExt ? 12 : 5.5, dt);
 
     if (this.gantryRail) {
@@ -302,10 +335,12 @@ class Tower {
     if (this.gantryPad) this.gantryPad.position.z = c.ext * this.mounts.reach;
 
     const p = this.w([0, this.mounts.catY, c.ext * this.mounts.reach], _ap), e = c.e;
+    c.scaleCur = damp(c.scaleCur, d.scale[lvl], 10, dt);
+    c.mutatePuff = Math.max(0, c.mutatePuff - dt * 2.8);
     e.x = p.x; e.y = p.y - (1 - easeOut(this.appear)) * .35; e.z = p.z;
     this.em.x = p.x; this.em.z = p.z;
-    e.scale = [.86, 1.08, 1.32][lvl] * (.35 + .65 * this.appear);
-    c.swipe = Math.max(0, c.swipe - dt * 4.2);
+    e.scale = c.scaleCur * (.35 + .65 * this.appear);
+    c.swipe = Math.max(0, c.swipe - dt * 4.5);
     c.cool -= dt;
 
     if (tgt) {
@@ -315,29 +350,48 @@ class Tower {
       c.hitDist = Math.max(.35, Math.hypot(dx, dz));
       c.hitDy = (tgt.y + tgt.hitH) - p.y;
 
-      if (c.cool <= 0 && c.ext > .75) {
+      const ready = isFire || c.ext > .75;
+      if (c.cool <= 0 && ready) {
         c.cool = d.rate[lvl] * rr(.94, 1.06);
         c.swipe = 1;
-        c.pawSide *= -1;
+        c.pawSide = (isFire && lvl < 3) ? 1 : -c.pawSide;
 
-        const hx = tgt.x, hy = tgt.y + tgt.hitH, hz = tgt.z;
-        const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), dir = c.pawSide;
-        for (let k = -1; k <= 1; k++) {
-          const ox = cs * k * .11, oz = -sn * k * .11, oy = k * .06;
-          FX.segs.push(
-            hx - cs * .26 * dir + ox, hy + .22 + oy, hz + sn * .26 * dir + oz, .048,
-            hx + cs * .26 * dir + ox, hy - .22 + oy, hz - sn * .26 * dir + oz, .012,
-            1.6, 1.6, 1.6, .95
-          );
+        if (!isFire) {
+          const hx = tgt.x, hy = tgt.y + tgt.hitH, hz = tgt.z;
+          const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), dir = c.pawSide;
+          for (let k = -1; k <= 1; k++) {
+            const ox = cs * k * .11, oz = -sn * k * .11, oy = k * .06;
+            FX.segs.push(
+              hx - cs * .26 * dir + ox, hy + .22 + oy, hz + sn * .26 * dir + oz, .048,
+              hx + cs * .26 * dir + ox, hy - .22 + oy, hz - sn * .26 * dir + oz, .012,
+              1.6, 1.6, 1.6, .95
+            );
+          }
+          fxSparks(hx, hy, hz, 6, 3.2, 1.5, 1.5, 1.5, { size: .045, grav: 4 });
+          sfx('arrowHit', hx, hz, .65, .85 + rnd() * .25);
+          hitMonster(tgt, d.dmg[lvl], 'claw', sn, cs, this);
+        } else {
+          const cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), sc = e.scale;
+          const side = lvl >= 3 ? c.pawSide : 1;
+          const lx = side * .20 * sc, lz = .72 * sc;
+          const sx = p.x + lx * cs + lz * sn, sy = p.y + .34 * sc, sz = p.z - lx * sn + lz * cs;
+          const dist = Math.hypot(tgt.x - sx, tgt.z - sz), T = clamp(dist / 10.0, .14, .65);
+          const q = aimPoint(tgt, T, _ap2), gy = G.B.heightAt(q.x, q.z);
+          G.shells.push({
+            x0: sx, y0: sy, z0: sz,
+            tx: q.x, ty: Math.max(gy, q.y - tgt.hitH) + .05, tz: q.z,
+            t: 0, T, dmg: d.dmg[lvl], splash: d.splash[lvl], tower: this,
+            x: sx, y: sy, z: sz, sm: 0, arc: .48 + dist * .12, fire: true, lvl
+          });
+          fxTimed(3, sx, sy, sz, .55, .55, 3.5, 2.0, .6, .9, .14);
+          fxSparks(sx, sy, sz, 4, 2.8, 3.0, 1.5, .4, { size: .04, grav: 3 });
+          sfx('ignite', sx, sz, .38, .85 + rnd() * .25);
         }
-        fxSparks(hx, hy, hz, 6, 3.2, 1.5, 1.5, 1.5, { size: .045, grav: 4 });
-        sfx('arrowHit', hx, hz, .65, .85 + rnd() * .25);
-        hitMonster(tgt, d.dmg[lvl], 'claw', sn, cs, this);
       }
     } else {
       c.yaw = angDamp(c.yaw, this.yaw + Math.sin(G.t * .7 + this.idx) * .55, 2.4, dt);
       c.pitch = damp(c.pitch, Math.sin(G.t * 1.2 + this.idx) * .06, 4, dt);
-      if (c.cool < .2) c.cool = .2;
+      if (c.cool < .15) c.cool = .15;
     }
 
     e.yaw = c.yaw;
@@ -346,7 +400,9 @@ class Tower {
     e.pawSide = c.pawSide;
     e.hitDist = c.hitDist;
     e.hitDy = c.hitDy;
-    rigGattoGraffiatore(e);
+    e.mutatePuff = c.mutatePuff;
+    if (isFire) rigGattoFuoco(e, lvl);
+    else rigGattoGraffiatore(e);
   }
 
   updBombard(dt, d, lvl) {
@@ -471,22 +527,34 @@ function updateProjectiles(dt) {
   for (let i = Sh.length - 1; i >= 0; i--) {
     const s = Sh[i]; s.t += dt; const u = Math.min(1, s.t / s.T);
     s.x = lerp(s.x0, s.tx, u); s.z = lerp(s.z0, s.tz, u); s.y = lerp(s.y0, s.ty, u) + s.arc * 4 * u * (1 - u);
+    if (s.fire) {
+      const fsc = .72 + (s.lvl || 1) * .16;
+      _tm.compose(_tv.set(s.x, s.y, s.z), _tq.setFromAxisAngle(_tz, s.t * 10), _ts.set(fsc, fsc, fsc));
+      KIT.gattoFuoco.fireball.put(_tm, 0, null);
+      FX.add.push(s.x, s.y, s.z, .55 * fsc, .55 * fsc, 0, 0, 3.2, 1.3, .25, 1, 0, 0, 0, 0);
+      s.sm += dt * 36;
+      while (s.sm > 1) { s.sm -= 1; fxPart(s.x + rr(-.06, .06), s.y + rr(-.06, .06), s.z + rr(-.06, .06), rr(-.4, .4), rr(.1, .7), rr(-.4, .4), rr(.2, .45), .055, 2.8, 1.1, .2, { drag: 1.5, rise: .5 }); }
+      if (u >= 1) { swapRemove(Sh, i); explodeAt(s.tx, s.ty, s.tz, s.dmg, s.splash, s.tower, true); }
+      continue;
+    }
     _tm.compose(_tv.set(s.x, s.y, s.z), _tq.setFromAxisAngle(_tz, s.t * 9), _ts.set(1, 1, 1)); KIT.shell.put(_tm, 0, null);
     FX.add.push(s.x, s.y + .1, s.z, .3, .3, 0, 0, 3.2, 1.5, .3, 1, 0, 0, 0, 0);
     s.sm += dt * 30; while (s.sm > 1) { s.sm -= 1; fxSmoke(s.x, s.y, s.z, rr(-.1, .1), rr(0, .2), rr(-.1, .1), rr(.5, .9), .16, .3, .26, .25, .25, .32, { drag: 1 }); if (rnd() < .5) fxPart(s.x, s.y, s.z, rr(-.5, .5), rr(-.2, .5), rr(-.5, .5), .4, .05, 2.5, 1.1, .2, { grav: 2 }); }
-    if (u >= 1) { swapRemove(Sh, i); explodeAt(s.tx, s.ty, s.tz, s.dmg, s.splash, s.tower); }
+    if (u >= 1) { swapRemove(Sh, i); explodeAt(s.tx, s.ty, s.tz, s.dmg, s.splash, s.tower, false); }
   }
 }
-function explodeAt(x, y, z, dmg, splash, tower) {
-  const sc = splash / 1.7;
+function explodeAt(x, y, z, dmg, splash, tower, isFire = false) {
+  const sc = splash / (isFire ? 1.55 : 1.7);
   fxExplosion(x, y, z, sc);
-  FX.decals.add(G.B.heightAt, x, z, splash * 1.2, .016, .013, .011, .85, 45);
-  sfx('explode', x, z, 1, clamp(sc - .6, 0, 1));
+  FX.decals.add(G.B.heightAt, x, z, splash * 1.15, .016, .013, .011, isFire ? .55 : .85, isFire ? 20 : 45);
+  sfx('explode', x, z, isFire ? .45 : 1, clamp(sc - .5, 0, 1));
   for (const m of G.mons) {
     if (m.dead || m.hp <= 0 || m.fly || !m.vis) continue;
     const d = Math.hypot(m.x - x, m.z - z); if (d > splash + m.rad) continue;
-    const k = lerp(1, .45, sat(d / splash)), l = d || 1;
+    const k = isFire ? 1 : lerp(1, .45, sat(d / splash)), l = d || 1;
     hitMonster(m, dmg * k, 'blast', (m.x - x) / l, (m.z - z) / l, tower);
   }
-  for (let i = 0; i < 5; i++) { _tm.compose(_tv.set(x + rr(-.3, .3), y + .2, z + rr(-.3, .3)), _tq.set(rr(-1, 1), rr(-1, 1), rr(-1, 1), 1).normalize(), _ts.set(.6, .6, .6)); addDebris(KIT.rubble, _tm, [.5, .45, .4], rr(-3, 3), rr(3, 6), rr(-3, 3), rr(4, 10), rr(1.6, 2.6)); }
+  if (!isFire) {
+    for (let i = 0; i < 5; i++) { _tm.compose(_tv.set(x + rr(-.3, .3), y + .2, z + rr(-.3, .3)), _tq.set(rr(-1, 1), rr(-1, 1), rr(-1, 1), 1).normalize(), _ts.set(.6, .6, .6)); addDebris(KIT.rubble, _tm, [.5, .45, .4], rr(-3, 3), rr(3, 6), rr(-3, 3), rr(4, 10), rr(1.6, 2.6)); }
+  }
 }

@@ -108,7 +108,8 @@ function buildTower(pad, kind, byPlayer) {
   const t = new Tower(pad, kind, G.B.pads.indexOf(pad)); G.towers.push(t); UI.ping(pad.x, pad.y, pad.z, byPlayer); return t;
 }
 function upgradeTower(t, byPlayer) {
-  if (!t || t.lvl >= 2 || t.state !== 'active' || G.phase !== 'play') return false; const c = t.def.cost[t.lvl + 1]; if (G.gold < c) return false;
+  const maxL = t && (t.def.maxLvl ?? 2);
+  if (!t || t.lvl >= maxL || t.state !== 'active' || G.phase !== 'play') return false; const c = t.def.cost[t.lvl + 1]; if (G.gold < c) return false;
   G.gold -= c; UI.goldShown = Math.min(UI.goldShown, G.gold); t.upgrade(); UI.ping(t.x, t.y, t.z, byPlayer); return true;
 }
 function sellTower(t) {
@@ -129,7 +130,7 @@ function aiThink(dt) {
   for (const kind of TOWER_KINDS) {
     const def = TOWER[kind];
     let need = ideal[kind] * (N + 1.6) - cnt[kind] + .35;
-    if (kind === 'archer') need += air * .2 + (N === 0 ? 1 : 0); if (kind === 'spire') need += air * .12 + armor * .1; if (kind === 'bombard') need += armor * .08 + swarm * .06 + (N >= 2 && cnt.bombard === 0 ? .5 : 0); if (kind === 'guard') need += swarm * .04 + (N >= 1 && cnt.guard === 0 ? .9 : 0);
+    if (kind === 'archer') need += swarm * .12 + (N === 0 ? 1 : 0); if (kind === 'spire') need += air * .28 + armor * .1; if (kind === 'bombard') need += armor * .08 + swarm * .06 + (N >= 2 && cnt.bombard === 0 ? .5 : 0); if (kind === 'guard') need += swarm * .04 + (N >= 1 && cnt.guard === 0 ? .9 : 0);
     if (need <= 0) continue;
     for (const pad of empty) {
       const cov = padCoverage(pad, def.range[0]) / (def.range[0] * 2);
@@ -145,10 +146,11 @@ function aiThink(dt) {
     }
   }
   for (const t of towers) {
-    if (t.state !== 'active' || t.lvl >= 2) continue;
+    const maxL = t.def.maxLvl ?? 2;
+    if (t.state !== 'active' || t.lvl >= maxL) continue;
     const c = t.def.cost[t.lvl + 1], use = sat(t.recent / 60);
-    let sc = (.5 + use * .9 + (t.lvl === 0 ? .12 : 0)) * (N >= 4 ? 1.25 : .7) * (empty.length === 0 ? 1.6 : 1) * (110 / c);
-    if (t.kind === 'archer') sc *= 1 + air * .06; if (t.kind === 'spire') sc *= 1 + armor * .05;
+    let sc = (.5 + use * .9 + (t.lvl === 0 ? .18 : 0)) * (N >= 3 ? 1.25 : .75) * (empty.length === 0 ? 1.6 : 1) * (110 / c);
+    if (t.kind === 'archer') sc *= 1 + swarm * .08; if (t.kind === 'spire') sc *= 1 + air * .12 + armor * .05;
     opts.push({ sc, cost: c, act: 'up', t });
   }
   if (!opts.length) return;

@@ -416,6 +416,7 @@ function initBestiary() {
   };
   initPurrcraftMonsters();
   initGattoGraffiatore();
+  initGattoFuoco();
 }
 
 function rigSpider(e) {
@@ -461,7 +462,6 @@ function rigToad(e) {
 }
 
 function initPurrcraftMonsters() {
-  // 1. Polipetto di Melma (Sciame)
   KIT.polipetto = {
     body: new PartBatch(S => {
       const bodyC = C(0x3a2648), bellyC = C(0x2d5a36), eyeC = C(0xb8ff38);
@@ -483,7 +483,6 @@ function initPurrcraftMonsters() {
     }, 600, { rad: .06, shadow: false }),
   };
 
-  // 2. Abominio di Roccia (Tank corazzato con venature aliene)
   const rkC = C(0x342f3d), rkD = C(0x211d28), veinC = C(0x7be036);
   KIT.abominio = {
     pelvis: new PartBatch(S => { S.rock(.21, 0, 0, 0, rkD, { sq: .72 }); }, 24, { rad: .2, shadow: false }),
@@ -509,10 +508,9 @@ function initPurrcraftMonsters() {
     lLeg: new PartBatch(S => { S.rock(.15, 0, -.12, 0, rkC, { sq: 1.1 }); S.box(.24, .1, .32, 0, -.24, .04, rkD, { l: L_ROCK }); }, 48, { rad: .13, shadow: false }),
   };
 
-  // 3. Tentacolo Alato (Volante)
   KIT.tentacolo = {
     body: new PartBatch(S => {
-      const fC = C(0x482242), fD = C(0x281326), eyeC = C(0xd4ff42);
+      const fC = C(0x482242), eyeC = C(0xd4ff42);
       S.ico(.17, 0, .03, 0, fC, { sc: [.9, 1.05, 1.25], d: 1, rough: .32 });
       S.sph(.075, 0, .05, .18, eyeC, { w: 6, h: 5, rough: .18, emis: .32, jit: 0 });
       S.box(.035, .1, .02, 0, .05, .25, COL.black, { jit: 0 });
@@ -533,7 +531,6 @@ function initPurrcraftMonsters() {
     }, 150, { rad: .05, shadow: false }),
   };
 
-  // 4. Boss: Amalgama Infetta
   KIT.amalgama = {
     body: new PartBatch(S => {
       const mC = C(0x3d223a), mG = C(0x284d30), eyeC = C(0xc8ff38);
@@ -705,5 +702,169 @@ function rigGattoGraffiatore(e) {
   }
 
   K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.6) * .48, Math.cos(t * 1.6) * .12), fl, e.tint);
+  return M0;
+}
+
+function initGattoFuoco() {
+  const techOrange = C(0xee6a24), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+  const brass = C(0xd99b26), tankRed = C(0xc4281c), glassCyan = C(0x66e8ff);
+  const steelD = C(0x3a4554), hoseDark = C(0x1f252e), warnY = C(0xf2b724);
+  const fGold = C(0xffa824), fCore = C(0xfff08a), lava = C(0xff4c12);
+
+  const addHose = (S, pts, r, colTube, colRing, colGlow = null) => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      S.seg(a, b, r, r, colTube, { n: 7, rough: .55, jit: 0 });
+      const mx = (a[0] + b[0]) * .5, my = (a[1] + b[1]) * .5, mz = (a[2] + b[2]) * .5;
+      const useGlow = colGlow && (i % 2 === 1);
+      S.sph(r * 1.24, mx, my, mz, useGlow ? colGlow : colRing, { w: 6, h: 5, emis: useGlow ? .75 : 0, jit: 0 });
+      if (i > 0) S.sph(r * 1.15, a[0], a[1], a[2], colTube, { w: 6, h: 5, jit: 0 });
+    }
+  };
+
+  KIT.gattoFuoco = {
+    body: new PartBatch(S => {
+      S.sph(.38, 0, .28, -.03, techOrange, { sc: [1.06, .92, 1.12], w: 10, h: 7, rough: .65 });
+      S.cyl(.26, .46, 0, .54, .02, techOrange, { n: 10, rt: 1.25, rough: .65 });
+      S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6, rough: .7 });
+      for (const s of [-1, 1]) {
+        S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6, rough: .65 });
+        S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        S.seg([s * .16, .72, -.22], [s * .18, .72, .16], .042, .042, steelD, { n: 5, l: L_METAL });
+        S.seg([s * .18, .72, .16], [s * .14, .44, .27], .038, .038, steelD, { n: 5, l: L_METAL });
+      }
+      S.box(.26, .08, .06, 0, .56, .27, steelD, { l: L_METAL, jit: 0 });
+      S.cyl(.072, .05, 0, .56, .30, brass, { n: 8, r: [HPI, 0, 0], l: L_METAL, rough: .35, jit: 0 });
+      S.cyl(.045, .06, 0, .56, .31, fCore, { n: 8, r: [HPI, 0, 0], emis: .85, jit: 0 });
+    }, 32, { rad: .4 }),
+
+    head: new PartBatch(S => {
+      S.sph(.36, 0, .26, .02, techOrange, { sc: [1.14, .95, 1.02], w: 10, h: 8, rough: .6 });
+      for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+      S.box(.15, .07, .08, 0, .13, .3, cream, { jit: 0 });
+      S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0], jit: 0 });
+      S.add(gTorus(16, .08, 5), { s: .37, p: [0, .40, .02], r: [HPI, 0, 0], c: steelD, l: L_METAL });
+      for (const s of [-1, 1]) {
+        S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35], jit: 0 });
+        S.cone(.14, .31, s * .21, .56, 0, techOrange, { n: 4, r: [0, 0, s * -.24] });
+        S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24], jit: 0 });
+        S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5, rough: .2, jit: 0 });
+        S.box(.024, .09, .025, s * .135, .28, .395, COL.black, { jit: 0 });
+        S.cyl(.105, .08, s * .14, .44, .32, brass, { n: 10, r: [HPI - .25, 0, 0], l: L_METAL, rough: .35, jit: 0 });
+        S.cyl(.075, .09, s * .14, .44, .33, glassCyan, { n: 10, r: [HPI - .25, 0, 0], emis: .65, jit: 0 });
+      }
+    }, 32, { rad: .36 }),
+
+    pawFree: new PartBatch(S => {
+      S.cyl(.092, .36, 0, -.14, .08, techOrange, { n: 8, r: [.45, 0, 0], rough: .65 });
+      S.sph(.112, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+    }, 32, { rad: .14, shadow: false }),
+
+    pawWand: new PartBatch(S => {
+      S.cyl(.092, .34, 0, -.13, .06, techOrange, { n: 8, r: [.42, 0, 0], rough: .65 });
+      S.sph(.108, 0, -.25, .15, steelD, { sc: [1.1, .85, 1.1], w: 7, h: 5, l: L_METAL });
+      S.cyl(.068, .18, 0, -.25, .08, brass, { n: 8, r: [HPI, 0, 0], l: L_METAL, rough: .35, jit: 0 });
+      S.cyl(.082, .36, 0, -.25, .28, steelD, { n: 8, r: [HPI, 0, 0], l: L_METAL, rough: .42, jit: 0 });
+      S.box(.04, .06, .16, 0, -.18, .26, warnY, { jit: 0 });
+      S.cyl(.105, .10, 0, -.25, .48, brass, { n: 8, r: [HPI, 0, 0], l: L_METAL, rough: .35, jit: 0 });
+      S.cyl(.072, .05, 0, -.25, .54, fCore, { n: 8, r: [HPI, 0, 0], emis: .95, jit: 0 });
+      S.cone(.045, .14, 0, -.17, .55, fGold, { n: 4, r: [.3, 0, 0], emis: .85, jit: 0 });
+    }, 64, { rad: .18, shadow: false }),
+
+    tail: new PartBatch(S => {
+      S.seg([0, 0, 0], [0, .24, -.22], .075, .062, techOrange, { n: 6 });
+      S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+      S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, techOrange, { n: 5 });
+      S.sph(.055, 0, .83, -.3, cream, { w: 6, h: 5 });
+    }, 32, { rad: .1, shadow: false }),
+
+    pack1: new PartBatch(S => {
+      S.box(.34, .48, .08, 0, .52, -.26, steelD, { l: L_METAL, jit: 0 });
+      S.cyl(.16, .50, 0, .54, -.39, tankRed, { n: 12, l: L_METAL, rough: .38, jit: 0 });
+      S.cyl(.172, .06, 0, .77, -.39, brass, { n: 12, l: L_METAL, rough: .35, jit: 0 });
+      S.cyl(.172, .06, 0, .31, -.39, steelD, { n: 12, l: L_METAL, rough: .42, jit: 0 });
+      S.box(.08, .22, .05, 0, .54, -.54, lava, { emis: .8, jit: 0 });
+      S.cyl(.075, .10, 0, .84, -.39, steelD, { n: 8, l: L_METAL, jit: 0 });
+      S.cone(.06, .16, 0, .96, -.39, fGold, { n: 5, emis: .8, jit: 0 });
+      S.cyl(.058, .12, .16, .35, -.39, brass, { n: 8, r: [0, 0, HPI], l: L_METAL, jit: 0 });
+      addHose(S, [
+        [.20, .35, -.39],
+        [.38, .31, -.34],
+        [.48, .26, -.18],
+        [.47, .24,  .02],
+        [.36, .26,  .16],
+        [.21, .29,  .22],
+      ], .042, hoseDark, warnY);
+    }, 32, { rad: .42 }),
+
+    pack2: new PartBatch(S => {
+      S.box(.54, .54, .10, 0, .54, -.26, steelD, { l: L_METAL, jit: 0 });
+      S.cyl(.11, .14, 0, .54, -.38, brass, { n: 10, r: [HPI, 0, 0], l: L_METAL, rough: .35, jit: 0 });
+      S.sph(.075, 0, .54, -.46, fCore, { w: 6, h: 5, emis: .95, jit: 0 });
+      for (const s of [-1, 1]) {
+        S.cyl(.155, .56, s * .20, .56, -.40, tankRed, { n: 12, l: L_METAL, rough: .38, jit: 0 });
+        S.cyl(.17, .065, s * .20, .82, -.40, brass, { n: 12, l: L_METAL, rough: .35, jit: 0 });
+        S.cyl(.17, .065, s * .20, .30, -.40, steelD, { n: 12, l: L_METAL, rough: .42, jit: 0 });
+        S.box(.07, .24, .05, s * .20, .56, -.55, lava, { emis: .85, jit: 0 });
+        S.cyl(.07, .12, s * .20, .90, -.40, steelD, { n: 8, l: L_METAL, jit: 0 });
+        S.cyl(.058, .12, s * .34, .34, -.40, brass, { n: 8, r: [0, 0, HPI], l: L_METAL, jit: 0 });
+        addHose(S, [
+          [s * .37, .34, -.40],
+          [s * .50, .29, -.30],
+          [s * .54, .25, -.12],
+          [s * .48, .24,  .06],
+          [s * .36, .27,  .17],
+          [s * .21, .29,  .22],
+        ], .045, hoseDark, warnY, lava);
+      }
+    }, 32, { rad: .5 }),
+
+    volcanoVents: new PartBatch(S => {
+      for (const s of [-1, 1]) {
+        S.cone(.11, .34, s * .20, 1.12, -.40, fGold, { n: 5, emis: .9, jit: 0 });
+        S.sph(.075, s * .20, .99, -.40, fCore, { w: 6, h: 5, emis: 1.0, jit: 0 });
+      }
+    }, 32, { rad: .25, shadow: false }),
+
+    fireball: new PartBatch(S => {
+      S.sph(.18, 0, 0, 0, lava, { w: 8, h: 6, emis: .85, jit: 0 });
+      S.sph(.11, 0, 0, .05, fCore, { w: 6, h: 5, emis: 1.0, jit: 0 });
+    }, 64, { rad: .18, shadow: false }),
+  };
+}
+
+function rigGattoFuoco(e, lvl) {
+  const K = KIT.gattoFuoco, s = e.scale || 1, fl = e.flash || 0, sw = e.swipe || 0;
+  const t = SH.uTime.value * 3.6 + (e.ph || 0);
+  const puff = e.mutatePuff > 0 ? Math.sin(e.mutatePuff * PI) * .3 : 0;
+  const recoil = Math.sin(sw * PI);
+  const sq = 1 + Math.sin(t) * .028 - recoil * .07 + puff;
+  const sx = (1 / Math.sqrt(Math.max(.5, sq))) * (1 + puff * .6);
+
+  const M0 = xf(_M[0], null, e.x, e.y, e.z, -recoil * .16, e.yaw, 0, s * sx, s * sq, s * sx);
+  K.body.put(M0, fl, e.tint);
+
+  const MHead = xf(_M[1], M0, 0, .78, .05, (e.pitch || 0) + recoil * .14, 0, Math.sin(t * .7) * .05);
+  K.head.put(MHead, fl, e.tint);
+
+  const dual = lvl >= 3;
+  const recR = dual ? (e.pawSide > 0 ? recoil : recoil * .25) : recoil;
+  const recL = dual ? (e.pawSide < 0 ? recoil : recoil * .25) : recoil;
+
+  K.pawWand.put(xf(_M[2], M0, .20, .54, .18 - recR * .08, -recR * .18, 0, 0), fl, e.tint);
+  if (dual) {
+    K.pawWand.put(xf(_M[3], M0, -.20, .54, .18 - recL * .08, -recL * .18, 0, 0), fl, e.tint);
+  } else {
+    K.pawFree.put(xf(_M[3], M0, -.19, .54, .18, -recoil * .32, .15, -.12), fl, e.tint);
+  }
+
+  K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.7) * .45, Math.cos(t * 1.7) * .12), fl, e.tint);
+
+  if (dual) {
+    K.pack2.put(M0, fl, e.tint);
+    if (lvl >= 4) K.volcanoVents.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1 + Math.sin(t * 5) * .14, 1), fl, null);
+  } else {
+    K.pack1.put(M0, fl, e.tint);
+  }
   return M0;
 }

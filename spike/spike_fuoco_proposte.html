@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Confronto Proposte: Evoluzione Gatto Fuoco</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0f151c; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    #ui {
+      position: fixed; top: 14px; left: 14px; width: 310px; z-index: 20;
+      background: rgba(16, 22, 30, 0.92); border: 1px solid #382a24;
+      border-radius: 10px; padding: 13px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+    }
+    h1 { font-size: 14.5px; margin-bottom: 8px; color: #ff944d; letter-spacing: 0.3px; }
+    .sub { font-size: 11.5px; color: #93a4b8; margin-bottom: 10px; line-height: 1.35; }
+    .row { margin-bottom: 9px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #9fb0c4; margin-bottom: 3px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #ff6b2b; cursor: pointer; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 9px; }
+    .btns4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+    button {
+      background: #222e3f; color: #fff; border: 1px solid #36475e;
+      border-radius: 6px; padding: 7px 6px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: #2f4057; }
+    button.fire { background: linear-gradient(135deg, #c93814, #e8621c); border-color: #ff9c54; }
+    button.fire:hover { background: linear-gradient(135deg, #e0441c, #ff762b); }
+    button.active { background: #2b6cb0; border-color: #63b3ed; }
+    .hint { font-size: 10.5px; color: #6e8199; margin-top: 8px; border-top: 1px solid #243040; padding-top: 7px; line-height: 1.4; }
+
+    #labels { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
+    .tag {
+      position: absolute; transform: translate(-50%, -100%);
+      background: rgba(13, 19, 27, 0.88); border: 1px solid #3c4d63;
+      border-radius: 8px; padding: 5px 9px; text-align: center;
+      white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    }
+    .tag.base { border-color: #e8893c; }
+    .tag.fire { border-color: #ff5e26; }
+    .tag .t { font-size: 12px; font-weight: 700; color: #fff; }
+    .tag.base .t { color: #ffbe78; }
+    .tag.fire .t { color: #ff8c52; }
+    .tag .d { font-size: 10.5px; color: #9fb0c4; margin-top: 1px; }
+
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content;
+      background: #1c2430; border: 1px solid #e5534b; border-radius: 10px; padding: 20px; z-index: 30;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0d1117; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>🐾 Confronto Evoluzione: Gatto Fuoco</h1>
+    <div class="sub">Sopra: <b>Gatto Base (0 DNA)</b> di riferimento.<br>Sotto: <b>3 proposte visive</b> per l'evoluzione Fuoco.</div>
+
+    <div class="row">
+      <label>Stadio Evoluzione (Proposte): <span id="lblLvl">1 DNA (Normale)</span></label>
+      <input id="rngLvl" type="range" min="1" max="4" step="1" value="1" />
+    </div>
+
+    <div class="btns">
+      <button id="btnAttack" class="fire">🔥 Testa Attacco [Spazio]</button>
+      <button id="btnTurn" class="active">Ruota 360°: ON</button>
+    </div>
+
+    <div class="row" style="margin-bottom:4px;">
+      <label>Inquadra:</label>
+    </div>
+    <div class="btns4">
+      <button id="camAll" class="active">Tutti</button>
+      <button id="camA">Prop. A</button>
+      <button id="camB">Prop. B</button>
+      <button id="camC">Prop. C</button>
+    </div>
+
+    <div class="hint">
+      <b>Mouse:</b> Trascina SX ruota • Rotella zoom • Trascina DX sposta.<br>
+      Usa lo slider <b>1 → 4 DNA</b> per vedere come ogni proposta cresce fino al <b>Gatto Vulcano (Chonker)</b>.
+    </div>
+  </div>
+
+  <div id="labels"></div>
+
+  <div id="err">
+    <strong style="color:#ff7b72;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startShowroom(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startShowroom() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startShowroom() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+
+  const COL = {
+    iron: C(0x4b5563), steel: C(0x8896a6), stoneD: C(0x2d3540),
+    black: [0.05, 0.06, 0.08], gold: C(0xf5c242)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f151c);
+  scene.fog = new THREE.FogExp2(0x0f151c, 0.025);
+
+  const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 120);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // Camera Orbit fluida con preset
+  const camGoal = { theta: 0.0, phi: 0.96, dist: 11.2, tx: 0, ty: 0.85, tz: 0.85 };
+  const camCur  = { ...camGoal };
+  function applyCamera() {
+    const h = camCur.dist * Math.sin(camCur.phi);
+    camera.position.set(
+      camCur.tx + h * Math.sin(camCur.theta),
+      camCur.ty + camCur.dist * Math.cos(camCur.phi),
+      camCur.tz + h * Math.cos(camCur.theta)
+    );
+    camera.lookAt(camCur.tx, camCur.ty, camCur.tz);
+  }
+  applyCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camGoal.theta -= dx * 0.008;
+      camGoal.phi = clamp(camGoal.phi - dy * 0.008, 0.14, HPI - 0.06);
+    } else {
+      const pan = camGoal.dist * 0.0018;
+      camGoal.tx -= (Math.cos(camGoal.theta) * dx + Math.sin(camGoal.theta) * dy) * pan;
+      camGoal.tz -= (-Math.sin(camGoal.theta) * dx + Math.cos(camGoal.theta) * dy) * pan;
+    }
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camGoal.dist = clamp(camGoal.dist * (e.deltaY > 0 ? 1.1 : 0.91), 3.0, 22);
+  }, { passive: false });
+
+  // Luci da showroom
+  scene.add(new THREE.HemisphereLight(0xaad0f2, 0x1d2530, 1.15));
+  const dirLight = new THREE.DirectionalLight(0xfff4e2, 1.35);
+  dirLight.position.set(5, 12, 8);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const warmFill = new THREE.PointLight(0xff6b2b, 1.3, 18);
+  warmFill.position.set(0, 3.0, 4.2);
+  scene.add(warmFill);
+
+  // Pavimento showroom
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 28), new THREE.MeshStandardMaterial({ color: 0x1c242f, roughness: 0.75 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+    const grid = new THREE.GridHelper(34, 34, 0x334154, 0x18202a);
+    grid.position.y = 0.005;
+    scene.add(grid);
+  }
+
+  // Soup & PartBatch
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const boost = 1 + (o.emis || 0) * 1.45;
+      this.items.push({ g, c: [Math.min(1, c[0] * boost), Math.min(1, c[1] * boost), Math.min(1, c[2] * boost)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 8), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 8, o.h || 6), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    build() {
+      let total = 0;
+      for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) {
+          col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2];
+        }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.12 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S);
+      this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1));
+      m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat) {
+      if (this.n >= this.cap) return;
+      this.mesh.setMatrixAt(this.n++, mat);
+    }
+    end() {
+      this.mesh.count = this.n;
+      this.mesh.visible = this.n > 0;
+      if (this.n) this.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  // Piedistalli + frecce di collegamento (Gatto Base sopra -> 3 Proposte sotto)
+  const SPOTS = [
+    { id: 'base', x:  0.0, y: 0.42, z: -2.0, title: 'GATTO BASE (0 DNA)', desc: 'Gatto Graffiatore — Riferimento', kind: 'base' },
+    { id: 'A',    x: -3.6, y: 0.34, z:  2.2, title: 'PROPOSTA A — Piro-Criniera', desc: 'Elementale puro: criniera fiamme + cratere', kind: 'fire' },
+    { id: 'B',    x:  0.0, y: 0.34, z:  2.2, title: 'PROPOSTA B — Magma-Ossidiana', desc: 'Roccia lavica con crepe incandescenti', kind: 'fire' },
+    { id: 'C',    x:  3.6, y: 0.34, z:  2.2, title: 'PROPOSTA C — Piro-Tecnico', desc: 'Stile Laboratorio: occhialoni + zaino fuoco', kind: 'fire' },
+  ];
+
+  function buildPedestals() {
+    for (const sp of SPOTS) {
+      const S = new Soup();
+      const H = sp.y, R = sp.kind === 'base' ? 1.05 : 1.15;
+      const ringCol = sp.kind === 'base' ? C(0xe8893c) : C(0xff4d1a);
+      S.cyl(R + .14, .14, 0, .07, 0, COL.stoneD, { n: 14 });
+      S.cyl(R, H, 0, H / 2, 0, COL.iron, { n: 14, rt: .93 });
+      S.add(gTorus(20, .045, 6), { s: R * .92, p: [0, H + .01, 0], r: [HPI, 0, 0], c: ringCol, emis: .55 });
+      const mesh = new THREE.Mesh(S.build(), MAT_INST);
+      mesh.position.set(sp.x, 0, sp.z);
+      mesh.castShadow = mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+
+    // Linee luminose a terra che collegano il Gatto Base alle 3 proposte sotto
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xff6b2b, transparent: true, opacity: 0.45 });
+    const addBar = (x1, z1, x2, z2) => {
+      const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, len), lineMat);
+      m.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+      m.rotation.y = Math.atan2(dx, dz);
+      scene.add(m);
+    };
+    addBar(0, -0.85, 0, 0.2);
+    addBar(-3.6, 0.2, 3.6, 0.2);
+    addBar(-3.6, 0.2, -3.6, 0.95);
+    addBar(0, 0.2, 0, 0.95);
+    addBar(3.6, 0.2, 3.6, 0.95);
+  }
+
+  // Etichette 2D proiettate sopra i modelli
+  const labelsRoot = document.getElementById('labels');
+  const labelEls = SPOTS.map(sp => {
+    const el = document.createElement('div');
+    el.className = 'tag ' + sp.kind;
+    el.innerHTML = `<div class="t">${sp.title}</div><div class="d">${sp.desc}</div>`;
+    labelsRoot.appendChild(el);
+    return { sp, el };
+  });
+
+  // Modelli 3D
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    // 0. GATTO BASE (identico a models.js)
+    KIT.base = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+        for (const cx of [-.055, 0, .055]) S.cone(.016, .085, cx, -.28, .31, [1, 1, 1], { n: 4, r: [HPI + .15, 0, 0], emis: .25 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .8, -.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+    };
+
+    const fRed = C(0xc83218), fDark = C(0x6e1810), fBelly = C(0xffd078), fGold = C(0xffa824), fCore = C(0xfff08a);
+    const obs = C(0x2b232a), obsL = C(0x473a42), lava = C(0xff4c12);
+
+    // PROPOSTA A — PIRO-CRINIERA (Elementale Puro: pelo rosso, criniera di fiamme, cratere al Lv 4)
+    KIT.propA = {
+      body: new PartBatch(S => {
+        S.sph(.39, 0, .29, -.03, fRed, { sc: [1.08, .94, 1.14], w: 10, h: 7 });
+        S.cyl(.27, .46, 0, .54, .02, fRed, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .20, fBelly, { sc: [.92, 1.15, .65], w: 8, h: 6, emis: .18 });
+        for (const s of [-1, 1]) {
+          S.sph(.20, s * .31, .19, -.08, fDark, { sc: [.88, .86, 1.25], w: 8, h: 6 });
+          S.sph(.115, s * .32, .07, .12, fGold, { sc: [1.0, .65, 1.25], w: 6, h: 4, emis: .3 });
+        }
+        S.add(gTorus(12, .16, 5), { s: .28, p: [0, .74, .04], r: [HPI, 0, 0], c: obs });
+        S.sph(.075, 0, .72, .32, fCore, { w: 6, h: 4, emis: .9 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.37, 0, .26, .02, fRed, { sc: [1.15, .96, 1.04], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, fBelly, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, fBelly);
+        S.cone(.042, .045, 0, .21, .39, fDark, { n: 4, r: [HPI, 0, 0] });
+        S.cone(.11, .28, 0, .62, .05, fGold, { n: 5, r: [-.18, 0, 0], emis: .65 });
+        S.cone(.065, .22, 0, .66, .08, fCore, { n: 4, r: [-.1, 0, 0], emis: .95 });
+        for (const s of [-1, 1]) {
+          S.box(.08, .02, .02, s * .045, .14, .36, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.145, .32, s * .22, .57, 0, fRed, { n: 4, r: [0, 0, s * -.25] });
+          S.cone(.085, .21, s * .22, .55, .03, fGold, { n: 4, r: [0, 0, s * -.25], emis: .6 });
+          S.sph(.075, s * .135, .28, .335, fCore, { w: 7, h: 5, emis: .9 });
+          S.box(.022, .085, .025, s * .135, .28, .405, fDark);
+          S.box(.14, .032, .04, s * .14, .36, .35, fDark, { r: [0, 0, s * -.28] });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.098, .38, 0, -.14, .08, fRed, { n: 8, r: [.45, 0, 0] });
+        S.sph(.12, 0, -.28, .18, fGold, { sc: [1.05, .75, 1.2], w: 7, h: 5, emis: .45 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fRed, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, fDark, { n: 6 });
+        S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, fRed, { n: 5 });
+        S.cone(.11, .28, 0, .93, -.30, fGold, { n: 5, emis: .8 });
+        S.sph(.075, 0, .84, -.30, fCore, { w: 6, h: 5, emis: 1.0 });
+      }, 2, { shadow: false }),
+      mane: new PartBatch(S => {
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU;
+          S.cone(.115, .30, Math.cos(a) * .34, .06, Math.sin(a) * .34, (i & 1) ? fGold : lava, {
+            n: 4, r: [Math.sin(a) * .68, 0, -Math.cos(a) * .68], emis: .78
+          });
+        }
+      }, 2, { shadow: false }),
+      volcano: new PartBatch(S => {
+        S.cyl(.30, .28, 0, .12, 0, obs, { n: 8, rt: .62 });
+        S.cyl(.17, .06, 0, .27, 0, fCore, { n: 8, emis: 1.0 });
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * TAU;
+          S.cone(.07, .24, Math.cos(a) * .11, .36, Math.sin(a) * .11, (i & 1) ? fCore : fGold, { n: 4, emis: .95 });
+        }
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA B — MAGMA-OSSIDIANA (Corazza di roccia vulcanica nera con crepe di lava luminose + corona cratere)
+    KIT.propB = {
+      body: new PartBatch(S => {
+        // Corpo tozzo in basalto/ossidiana
+        S.sph(.41, 0, .29, -.02, obs, { sc: [1.14, .92, 1.15], w: 8, h: 6 });
+        S.cyl(.29, .46, 0, .54, .02, obs, { n: 8, rt: 1.24 });
+        // Nucleo/pancia di magma incandescente + venature laviche
+        S.sph(.24, 0, .47, .23, lava, { sc: [.88, 1.12, .55], w: 7, h: 5, emis: .85 });
+        S.sph(.14, 0, .47, .31, fCore, { sc: [.75, .95, .35], w: 6, h: 4, emis: 1.0 });
+        for (const s of [-1, 1]) {
+          S.box(.08, .28, .08, s * .22, .48, .22, obsL, { r: [0, 0, s * .22] }); // placche rocciose
+          S.sph(.21, s * .32, .19, -.06, obsL, { sc: [.88, .85, 1.2], w: 7, h: 5 });
+          S.sph(.12, s * .33, .08, .12, lava, { sc: [1.0, .65, 1.2], w: 6, h: 4, emis: .75 });
+        }
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.37, 0, .26, .02, obs, { sc: [1.16, .95, 1.04], w: 8, h: 6 });
+        // Crepe di lava sulle guance
+        for (const s of [-1, 1]) {
+          S.sph(.13, s * .14, .17, .27, obsL, { sc: [1.1, .85, .9], w: 6, h: 5 });
+          S.box(.12, .035, .04, s * .26, .22, .22, lava, { r: [0, s * .4, s * .2], emis: .95 });
+          // Orecchie di cristallo lavico
+          S.cone(.15, .33, s * .22, .57, 0, obsL, { n: 4, r: [0, 0, s * -.25] });
+          S.cone(.085, .23, s * .22, .55, .035, lava, { n: 4, r: [0, 0, s * -.25], emis: .95 });
+          // Occhi a fessura di brace
+          S.box(.13, .055, .04, s * .135, .28, .36, fCore, { r: [0, 0, s * -.18], emis: 1.0 });
+        }
+        S.cone(.045, .045, 0, .20, .39, lava, { n: 4, r: [HPI, 0, 0], emis: .9 });
+        // Mini-cratere sulla cima della testa (bocca vulcanica)
+        S.cyl(.18, .14, 0, .59, -.02, obsL, { n: 7, rt: .75 });
+        S.cyl(.12, .04, 0, .67, -.02, fCore, { n: 7, emis: 1.0 });
+      }, 2),
+      paw: new PartBatch(S => {
+        S.box(.19, .34, .19, 0, -.14, .08, obsL, { r: [.42, 0, 0] });
+        S.sph(.13, 0, -.28, .18, lava, { sc: [1.1, .75, 1.2], w: 6, h: 4, emis: .85 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        // Coda a blocchi di roccia fluttuanti con giunti di magma
+        S.sph(.09, 0, .14, -.16, obsL, { w: 6, h: 5 });
+        S.sph(.06, 0, .30, -.22, lava, { w: 5, h: 4, emis: .95 });
+        S.sph(.09, 0, .48, -.18, obsL, { w: 6, h: 5 });
+        S.sph(.06, 0, .64, -.24, fGold, { w: 5, h: 4, emis: 1.0 });
+        S.cone(.13, .28, 0, .82, -.26, fCore, { n: 5, emis: 1.0 });
+      }, 2, { shadow: false }),
+      shoulders: new PartBatch(S => {
+        // Spallacci di basalto + spuntoni di magma (Lv 2+)
+        for (const s of [-1, 1]) {
+          S.box(.26, .22, .30, s * .42, .64, .02, obsL, { r: [0, 0, s * -.25] });
+          S.cone(.09, .24, s * .48, .82, .02, lava, { n: 4, r: [0, 0, s * -.35], emis: .95 });
+        }
+      }, 2, { shadow: false }),
+      crownLava: new PartBatch(S => {
+        // Pennacchio di magma eruttivo (Lv 4)
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU;
+          S.cone(.085, .36, Math.cos(a) * .09, .86, Math.sin(a) * .09 - .02, (i & 1) ? fCore : lava, {
+            n: 4, r: [Math.sin(a) * .3, 0, -Math.cos(a) * .3], emis: 1.0
+          });
+        }
+      }, 2, { shadow: false }),
+    };
+
+    // PROPOSTA C — PIRO-TECNICO DA LABORATORIO (Gatto morbido + occhialoni saldatore + serbatoio carburante piro-DNA)
+    const techOrange = C(0xee6a24), brass = C(0xd99b26), tankRed = C(0xc4281c), glassCyan = C(0x66e8ff), steelD = C(0x3a4554);
+    KIT.propC = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, techOrange, { sc: [1.06, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, techOrange, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        // Imbragatura da laboratorio + manometro dorato sul petto
+        S.add(gTorus(12, .16, 5), { s: .28, p: [0, .72, .04], r: [HPI, 0, 0], c: steelD });
+        S.cyl(.085, .06, 0, .68, .31, brass, { n: 8, r: [HPI, 0, 0] });
+        S.cyl(.055, .07, 0, .68, .32, fCore, { n: 8, r: [HPI, 0, 0], emis: .85 });
+      }, 2),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, techOrange, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        // Fascia occhialoni da saldatore/laboratorio sulla fronte
+        S.add(gTorus(16, .08, 5), { s: .37, p: [0, .40, .02], r: [HPI, 0, 0], c: steelD });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          S.cone(.14, .31, s * .21, .56, 0, techOrange, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          // Lenti occhialoni sulla fronte
+          S.cyl(.105, .08, s * .14, .44, .32, brass, { n: 10, r: [HPI - .25, 0, 0] });
+          S.cyl(.075, .09, s * .14, .44, .33, glassCyan, { n: 10, r: [HPI - .25, 0, 0], emis: .7 });
+        }
+      }, 2),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .36, 0, -.14, .08, techOrange, { n: 8, r: [.45, 0, 0] });
+        // Guanto / ugello lanciafiamme sulla zampa
+        S.cyl(.12, .20, 0, -.28, .20, steelD, { n: 8, r: [HPI + .1, 0, 0] });
+        S.cyl(.08, .08, 0, -.28, .32, brass, { n: 8, r: [HPI + .1, 0, 0] });
+        S.sph(.06, 0, -.28, .36, fCore, { w: 6, h: 4, emis: .95 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, techOrange, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .80, -.28], .05, .036, techOrange, { n: 5 });
+        S.sph(.055, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 2, { shadow: false }),
+      pack1: new PartBatch(S => {
+        // Serbatoio singolo di carburante piro-DNA sulla schiena (Lv 1-2)
+        S.cyl(.16, .48, 0, .52, -.36, tankRed, { n: 10 });
+        S.cyl(.17, .06, 0, .74, -.36, brass, { n: 10 });
+        S.cyl(.17, .06, 0, .30, -.36, steelD, { n: 10 });
+        S.cyl(.08, .12, 0, .82, -.36, steelD, { n: 8 });
+        S.cone(.07, .18, 0, .94, -.36, fGold, { n: 5, emis: .85 });
+      }, 2, { shadow: false }),
+      pack2: new PartBatch(S => {
+        // Doppio serbatoio pressurizzato gigante + scarichi infuocati (Lv 3-4)
+        for (const s of [-1, 1]) {
+          S.cyl(.15, .56, s * .19, .56, -.38, tankRed, { n: 10 });
+          S.cyl(.165, .07, s * .19, .82, -.38, brass, { n: 10 });
+          S.cyl(.165, .07, s * .19, .32, -.38, steelD, { n: 10 });
+          S.cyl(.075, .14, s * .19, .92, -.38, steelD, { n: 8 });
+          S.cone(.095, .28, s * .19, 1.08, -.38, fGold, { n: 5, emis: .9 });
+          S.sph(.065, s * .19, .98, -.38, fCore, { w: 6, h: 4, emis: 1.0 });
+        }
+        S.box(.42, .12, .14, 0, .56, -.34, steelD);
+      }, 2, { shadow: false }),
+    };
+
+    // Proiettile fuoco per anteprima attacco
+    KIT.fireball = new PartBatch(S => {
+      S.sph(.19, 0, 0, 0, lava, { w: 8, h: 6, emis: .9 });
+      S.sph(.12, 0, 0, .05, fCore, { w: 6, h: 5, emis: 1.0 });
+    }, 12, { shadow: false });
+  }
+
+  function rigModel(K, kind, x, y, z, yaw, scale, atk, lvl) {
+    const t = SH.uTime.value * (kind === 'base' ? 3.0 : 3.6);
+    const recoil = atk > 0 ? Math.sin(atk * PI) : 0;
+    const sq = 1 + Math.sin(t) * .028 - recoil * .08;
+    const sx = 1 / Math.sqrt(sq);
+
+    const pitchBody = kind === 'base' ? recoil * .25 : -recoil * .22;
+    const M0 = xf(_M[0], null, x, y, z, pitchBody, yaw, 0, scale * sx, scale * sq, scale * sx);
+    K.body.put(M0);
+
+    const MHead = xf(_M[1], M0, 0, .78, .05, -pitchBody * .8, 0, Math.sin(t * .7) * .06);
+    K.head.put(MHead);
+
+    for (const side of [-1, 1]) {
+      const active = kind === 'base' ? (side === 1 ? recoil : 0) : recoil;
+      const mp = xf(_M[2 + (side > 0 ? 1 : 0)], M0, side * .18, .54, .18 + active * .34, -active * 1.15, side * -active * .3, side * active * .22);
+      K.paw.put(mp);
+    }
+
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.7) * .45, Math.cos(t * 1.7) * .12));
+
+    if (kind === 'A') {
+      if (lvl >= 2) {
+        const ms = 0.86 + lvl * 0.08;
+        K.mane.put(xf(_M[5], M0, 0, .72, .02, 0, t * .65, 0, ms, ms * (1 + Math.sin(t * 2.5) * .12), ms));
+      }
+      if (lvl >= 4) {
+        K.volcano.put(xf(_M[6], M0, 0, .58, -.28, -.35, 0, 0, 1.0, 1.0 + Math.sin(t * 4) * .08, 1.0));
+      }
+    } else if (kind === 'B') {
+      if (lvl >= 2) {
+        K.shoulders.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1, 1));
+      }
+      if (lvl >= 4) {
+        K.crownLava.put(xf(_M[6], MHead, 0, 0, 0, 0, t * 1.1, 0, 1, 1 + Math.sin(t * 4.5) * .12, 1));
+      }
+    } else if (kind === 'C') {
+      if (lvl <= 2) {
+        K.pack1.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1, 1));
+      } else {
+        K.pack2.put(xf(_M[5], M0, 0, 0, 0, 0, 0, 0, 1, 1, 1));
+      }
+    }
+  }
+
+  initModels();
+  buildPedestals();
+
+  const LVL_NAMES = ['', '1 DNA (Normale)', '2 DNA (Paffuto)', '3 DNA (Grande)', '4 DNA (Gatto Vulcano)'];
+  const SCALES = [0.86, 1.00, 1.16, 1.34, 1.54];
+  let dnaLvl = 1, turntable = true, spinAngle = 0, atkTimer = 0;
+  const shots = [];
+
+  function triggerAttack() {
+    atkTimer = 1.0;
+    for (const sp of SPOTS) {
+      if (sp.kind !== 'fire') continue;
+      const yaw = turntable ? spinAngle : 0;
+      const sx = sp.x + Math.sin(yaw) * 0.55;
+      const sz = sp.z + Math.cos(yaw) * 0.55;
+      shots.push({
+        x: sx, y: sp.y + 0.72 * SCALES[dnaLvl], z: sz,
+        vx: Math.sin(yaw) * 5.2, vy: 1.6, vz: Math.cos(yaw) * 5.2,
+        life: 0.55, sc: 0.75 + dnaLvl * 0.18
+      });
+    }
+  }
+
+  // UI controls
+  document.getElementById('rngLvl').oninput = e => {
+    dnaLvl = +e.target.value;
+    document.getElementById('lblLvl').textContent = LVL_NAMES[dnaLvl];
+  };
+  document.getElementById('btnAttack').onclick = triggerAttack;
+  const btnTurn = document.getElementById('btnTurn');
+  btnTurn.onclick = () => {
+    turntable = !turntable;
+    btnTurn.textContent = 'Ruota 360°: ' + (turntable ? 'ON' : 'OFF');
+    btnTurn.classList.toggle('active', turntable);
+    if (!turntable) spinAngle = 0;
+  };
+
+  const camBtns = ['camAll', 'camA', 'camB', 'camC'];
+  function setCamPreset(id, tx, ty, tz, dist, phi, theta) {
+    camGoal.tx = tx; camGoal.ty = ty; camGoal.tz = tz;
+    camGoal.dist = dist; camGoal.phi = phi; camGoal.theta = theta;
+    for (const b of camBtns) document.getElementById(b).classList.toggle('active', b === id);
+  }
+  document.getElementById('camAll').onclick = () => setCamPreset('camAll', 0, 0.85, 0.85, 11.2, 0.96, 0.0);
+  document.getElementById('camA').onclick   = () => setCamPreset('camA', -3.6, 1.0, 2.2, 4.6, 1.05, 0.35);
+  document.getElementById('camB').onclick   = () => setCamPreset('camB',  0.0, 1.0, 2.2, 4.6, 1.05, 0.35);
+  document.getElementById('camC').onclick   = () => setCamPreset('camC',  3.6, 1.0, 2.2, 4.6, 1.05, 0.35);
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); triggerAttack(); } });
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  const projV = new THREE.Vector3();
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    SH.uTime.value += dt;
+
+    for (const k of ['theta', 'phi', 'dist', 'tx', 'ty', 'tz']) camCur[k] = damp(camCur[k], camGoal[k], 8, dt);
+    applyCamera();
+
+    if (turntable) spinAngle += dt * 0.55;
+    atkTimer = Math.max(0, atkTimer - dt * 2.4);
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    const yaw = turntable ? spinAngle : 0;
+    rigModel(KIT.base,  'base', SPOTS[0].x, SPOTS[0].y + 0.04, SPOTS[0].z, yaw, SCALES[0],      atkTimer, 0);
+    rigModel(KIT.propA, 'A',    SPOTS[1].x, SPOTS[1].y + 0.04, SPOTS[1].z, yaw, SCALES[dnaLvl], atkTimer, dnaLvl);
+    rigModel(KIT.propB, 'B',    SPOTS[2].x, SPOTS[2].y + 0.04, SPOTS[2].z, yaw, SCALES[dnaLvl], atkTimer, dnaLvl);
+    rigModel(KIT.propC, 'C',    SPOTS[3].x, SPOTS[3].y + 0.04, SPOTS[3].z, yaw, SCALES[dnaLvl], atkTimer, dnaLvl);
+
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const sh = shots[i];
+      sh.life -= dt;
+      sh.vy -= 7.5 * dt;
+      sh.x += sh.vx * dt; sh.y = Math.max(0.15, sh.y + sh.vy * dt); sh.z += sh.vz * dt;
+      if (sh.life <= 0) { shots.splice(i, 1); continue; }
+      const s = sh.sc * Math.min(1, sh.life * 4);
+      KIT.fireball.put(xf(_M[8], null, sh.x, sh.y, sh.z, sh.life * 9, sh.life * 6, 0, s, s, s));
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+
+    // Aggiorna posizione etichette 2D
+    for (const { sp, el } of labelEls) {
+      const sc = sp.kind === 'base' ? SCALES[0] : SCALES[dnaLvl];
+      projV.set(sp.x, sp.y + 1.55 * sc + 0.35, sp.z).project(camera);
+      if (projV.z > 1) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + 'px';
+      el.style.top  = ((-projV.y * 0.5 + 0.5) * innerHeight) + 'px';
+    }
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>
