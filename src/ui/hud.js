@@ -844,7 +844,7 @@ const UI = (() => {
     if (U.titleT < 7 && !U.menu) {
       const a = sat(Math.min((U.titleT - .4) * 1.5, (6.6 - U.titleT) * 1.2));
       if (a > 0) {
-        const sc = s * 2, t1 = 'Cinderwatch', full = G.B.bio.name + ' · The commander plays until you take over.', t2 = tw(full) + pad * 4 > Wr - iL - 6 * s ? [G.B.bio.name, 'The commander plays', 'until you take over.'] : [full]; if (G.best > 5) t2.push('Best run: wave ' + G.best);
+        const sc = s * 2, t1 = 'Purr-craft', full = G.B.bio.name + ' · The commander plays until you take over.', t2 = tw(full) + pad * 4 > Wr - iL - 6 * s ? [G.B.bio.name, 'The commander plays', 'until you take over.'] : [full]; if (G.best > 5) t2.push('Best run: wave ' + G.best);
         let w = PX.measure(t1) * sc; for (const l of t2) w = Math.max(w, tw(l)); w += pad * 4; const h = PX.LINE * sc + LH * t2.length + pad * 2 + 2 * s, yy = Hb - h - 12 * s - zb;
         c.globalAlpha = a; plate(Math.round(W / 2 - w / 2), yy, w, h); PX.text(c, t1, W / 2, yy + pad, sc, '#ffd9a8', { align: 'c' }); t2.forEach((l, k) => text(l, W / 2, yy + pad + PX.LINE * sc + s + k * LH, k === 0 && t2.length > 1 ? COLR.tx : COLR.dim, { align: 'c' })); c.globalAlpha = 1;
       }
