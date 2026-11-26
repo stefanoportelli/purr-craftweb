@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Spike Telescopico & Flusso Mostri</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #10161d; color: #e6edf3; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #ui {
+      position: fixed; top: 16px; left: 16px; width: 325px; z-index: 10;
+      background: rgba(18, 25, 34, 0.92); border: 1px solid #2e3b4e;
+      border-radius: 10px; padding: 14px; backdrop-filter: blur(6px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 { font-size: 15px; margin-bottom: 8px; color: #ffad5c; letter-spacing: 0.4px; }
+    #status {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0d131a; border: 1px solid #263344; border-radius: 6px;
+      padding: 7px 10px; margin-bottom: 10px; font-size: 12px;
+    }
+    .badge {
+      padding: 2px 8px; border-radius: 99px; font-weight: 700; font-size: 11px;
+      background: #233042; color: #9fb0c4;
+    }
+    .badge.active { background: #1f5c35; color: #7ee787; }
+    .badge.hold { background: #5c4314; color: #f2cc60; }
+    .badge.stun { background: #5c1f24; color: #ff7b72; }
+    .row { margin-bottom: 9px; }
+    label { display: flex; justify-content: space-between; font-size: 12px; color: #9fb0c4; margin-bottom: 3px; }
+    label span { color: #fff; font-weight: 600; }
+    input[type="range"] { width: 100%; accent-color: #ff9436; cursor: pointer; }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    button {
+      background: #233042; color: #fff; border: 1px solid #384a63;
+      border-radius: 6px; padding: 7px 8px; font-size: 11.5px; font-weight: 600;
+      cursor: pointer; transition: 0.15s;
+    }
+    button:hover { background: #2f4057; }
+    button.primary { background: #d96b27; border-color: #ff9436; }
+    button.primary:hover { background: #e87a35; }
+    button.active { background: #2b6cb0; border-color: #63b3ed; }
+    button.full { grid-column: span 2; }
+    .chk { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #cbd5e1; cursor: pointer; margin-top: 5px; }
+    .hint { font-size: 11px; color: #6e8199; margin-top: 9px; border-top: 1px solid #253040; padding-top: 7px; line-height: 1.4; }
+    #err {
+      display: none; position: fixed; inset: 0; margin: auto; width: 460px; height: fit-content;
+      background: #1c2430; border: 1px solid #e5534b; border-radius: 10px; padding: 20px; z-index: 20;
+      line-height: 1.5; font-size: 13px;
+    }
+    #err code { background: #0d1117; padding: 2px 6px; border-radius: 4px; color: #79c0ff; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>🐾 Spike: Passerella Telescopica</h1>
+    <div id="status">
+      <span id="lblState" class="badge">RITRATTA</span>
+      <span id="lblExt">Sbalzo: 0%</span>
+    </div>
+
+    <div class="btns">
+      <button id="btnSpawnGround" class="primary">+ Gruppo Polipetti</button>
+      <button id="btnSpawnAir">+ Tentacoli Alati</button>
+      <button id="btnAutoFlow" class="active">Flusso Auto: ON</button>
+      <button id="btnStun">Simula EMP (3s)</button>
+      <button id="btnClear">Pulisci Strada</button>
+      <button id="btnResetCam">Reset Camera</button>
+    </div>
+
+    <div class="row">
+      <label>Stazza Gatto: <span id="lblLvl">0 DNA (Gattino)</span></label>
+      <input id="rngLvl" type="range" min="0" max="2" step="1" value="0" />
+    </div>
+
+    <div class="row">
+      <label>Raggio Ingaggio: <span id="lblRange">4.40 u</span></label>
+      <input id="rngRange" type="range" min="3.2" max="5.4" step="0.1" value="4.4" />
+    </div>
+
+    <div class="row">
+      <label>Attesa Rientro (Hold): <span id="lblHold">1.20 s</span></label>
+      <input id="rngHold" type="range" min="0.0" max="2.5" step="0.1" value="1.2" />
+    </div>
+
+    <div class="row">
+      <label>Velocità Simulazione: <span id="lblSpeed">1.00x</span></label>
+      <input id="rngSpeed" type="range" min="0.15" max="2.0" step="0.05" value="1.0" />
+    </div>
+
+    <label class="chk"><input id="chkKill" type="checkbox" checked /> I graffi eliminano i Polipetti</label>
+    <label class="chk"><input id="chkRing" type="checkbox" checked /> Mostra anello raggio d'attacco</label>
+
+    <div class="hint">
+      <b>Mouse:</b> Trascina SX ruota • Rotella zoom • Trascina DX sposta.<br>
+      <b>Test:</b> I Polipetti attivano la passerella; i Tentacoli Alati vengono ignorati.
+    </div>
+  </div>
+
+  <div id="err">
+    <strong style="color:#ff7b72;">Three.js non trovato</strong><br><br>
+    Verifica che esista <code>../vendor/three.min.js</code> rispetto alla cartella <code>spike/</code>.
+  </div>
+
+<script>
+'use strict';
+
+(function loadThree(sources, idx) {
+  if (window.THREE) { startSpike(); return; }
+  if (idx >= sources.length) { document.getElementById('err').style.display = 'block'; return; }
+  const s = document.createElement('script');
+  s.src = sources[idx];
+  s.onload = () => window.THREE ? startSpike() : loadThree(sources, idx + 1);
+  s.onerror = () => loadThree(sources, idx + 1);
+  document.head.appendChild(s);
+})([
+  '../vendor/three.min.js',
+  '../three.min.js',
+  '../lib/three.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+  'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+], 0);
+
+function startSpike() {
+  const PI = Math.PI, HPI = PI / 2, TAU = PI * 2;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
+  const rr = (a, b) => a + Math.random() * (b - a);
+  const C = hex => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+  const mulC = (c, f) => [c[0] * f, c[1] * f, c[2] * f];
+  const angDiff = (a, b) => { let d = (b - a + PI) % TAU; if (d < 0) d += TAU; return d - PI; };
+  const angDamp = (a, b, k, dt) => a + angDiff(a, b) * (1 - Math.exp(-k * dt));
+
+  const COL = {
+    iron: C(0x4b5563), steel: C(0x8896a6), stoneD: C(0x2d3540),
+    black: [0.05, 0.06, 0.08], gold: C(0xf5c242), bone: C(0xe5dec9)
+  };
+  const SH = { uTime: { value: 0 } };
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x10161d);
+  scene.fog = new THREE.FogExp2(0x10161d, 0.032);
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 120);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // Controlli camera (Orbit + Pan + Zoom)
+  let camTheta = 0.55, camPhi = 0.96, camDist = 9.8;
+  const camTarget = new THREE.Vector3(0, 0.5, 2.1);
+  function updateCamera() {
+    const h = camDist * Math.sin(camPhi);
+    camera.position.set(
+      camTarget.x + h * Math.sin(camTheta),
+      camTarget.y + camDist * Math.cos(camPhi),
+      camTarget.z + h * Math.cos(camTheta)
+    );
+    camera.lookAt(camTarget);
+  }
+  function resetCamera() {
+    camTheta = 0.55; camPhi = 0.96; camDist = 9.8;
+    camTarget.set(0, 0.5, 2.1);
+    updateCamera();
+  }
+  resetCamera();
+
+  let dragMode = 0, lastX = 0, lastY = 0;
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragMode = (e.button === 2 || e.shiftKey) ? 2 : 1;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragMode = 0; });
+  window.addEventListener('mousemove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (dragMode === 1) {
+      camTheta -= dx * 0.008;
+      camPhi = clamp(camPhi - dy * 0.008, 0.08, HPI - 0.04);
+    } else {
+      const pan = camDist * 0.0018;
+      camTarget.x -= (Math.cos(camTheta) * dx + Math.sin(camTheta) * dy) * pan;
+      camTarget.z -= (-Math.sin(camTheta) * dx + Math.cos(camTheta) * dy) * pan;
+    }
+    updateCamera();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camDist = clamp(camDist * (e.deltaY > 0 ? 1.1 : 0.91), 2.5, 22);
+    updateCamera();
+  }, { passive: false });
+
+  // Luci
+  scene.add(new THREE.HemisphereLight(0x9ec5e8, 0x1e2631, 1.15));
+  const dirLight = new THREE.DirectionalLight(0xfff4e0, 1.35);
+  dirLight.position.set(6, 11, 7);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.set(1024, 1024);
+  scene.add(dirLight);
+  const rimLight = new THREE.PointLight(0x38f2ff, 1.1, 14);
+  rimLight.position.set(-3, 3, 2);
+  scene.add(rimLight);
+
+  // Pavimento + corsia stradale reale (centro Z = 3.00u, bordi 1.75u e 4.25u, corsia mostri 2.10-3.95u)
+  {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(26, 20), new THREE.MeshStandardMaterial({ color: 0x262f3b, roughness: 0.72 }));
+    floor.rotation.x = -HPI; floor.receiveShadow = true;
+    scene.add(floor);
+
+    const grid = new THREE.GridHelper(26, 26, 0x3b4859, 0x1d242e);
+    grid.position.y = 0.005;
+    scene.add(grid);
+
+    const road = new THREE.Mesh(new THREE.BoxGeometry(20, 0.04, 2.5), new THREE.MeshStandardMaterial({ color: 0x4b535e, roughness: 0.85 }));
+    road.position.set(0, 0.02, 3.0);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    for (const bz of [1.75, 4.25]) {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(20, 0.07, 0.08), new THREE.MeshStandardMaterial({ color: 0x2a313a }));
+      curb.position.set(0, 0.035, bz);
+      scene.add(curb);
+    }
+  }
+
+  // Anello visivo del raggio d'attacco
+  let rangeRing = null;
+  function buildRangeRing(r) {
+    const vis = rangeRing ? rangeRing.visible : true;
+    if (rangeRing) { scene.remove(rangeRing); rangeRing.geometry.dispose(); }
+    const geo = new THREE.RingGeometry(r - 0.06, r + 0.02, 72);
+    rangeRing = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: 0xffc864, transparent: true, opacity: 0.35, side: THREE.DoubleSide
+    }));
+    rangeRing.rotation.x = -HPI;
+    rangeRing.position.y = 0.055;
+    rangeRing.visible = vis;
+    scene.add(rangeRing);
+  }
+
+  const gTorus = (rSeg, tube, tSeg) => new THREE.TorusGeometry(1, tube, tSeg, rSeg);
+  class Soup {
+    constructor() { this.items = []; }
+    _push(geo, c, o = {}) {
+      const g = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g.attributes.normal) g.computeVertexNormals();
+      const s = Array.isArray(o.s) ? o.s : (o.s !== undefined ? [o.s, o.s, o.s] : [1, 1, 1]);
+      const r = o.r || [0, 0, 0], p = o.p || [0, 0, 0];
+      const m = new THREE.Matrix4().compose(
+        new THREE.Vector3(p[0], p[1], p[2]),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], 'XYZ')),
+        new THREE.Vector3(s[0], s[1], s[2])
+      );
+      g.applyMatrix4(m);
+      const boost = 1 + (o.emis || 0) * 1.4;
+      this.items.push({ g, c: [Math.min(1, c[0] * boost), Math.min(1, c[1] * boost), Math.min(1, c[2] * boost)] });
+    }
+    box(w, h, d, x, y, z, c, o = {}) { this._push(new THREE.BoxGeometry(w, h, d), c, { ...o, p: [x, y, z] }); }
+    cyl(r, h, x, y, z, c, o = {}) { this._push(new THREE.CylinderGeometry(r * (o.rt ?? 1), r, h, o.n || 8), c, { ...o, p: [x, y, z] }); }
+    sph(r, x, y, z, c, o = {}) { this._push(new THREE.SphereGeometry(r, o.w || 8, o.h || 6), c, { ...o, s: o.sc || [1, 1, 1], p: [x, y, z] }); }
+    cone(r, h, x, y, z, c, o = {}) { this._push(new THREE.ConeGeometry(r, h, o.n || 4), c, { ...o, p: [x, y, z] }); }
+    seg(a, b, r0, r1, c, o = {}) {
+      const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b);
+      const dir = vb.clone().sub(va), len = dir.length();
+      if (len < 1e-5) return;
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+      const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+      this._push(new THREE.CylinderGeometry(r1, r0, len, o.n || 6), c, { ...o, r: [e.x, e.y, e.z], p: [(a[0]+b[0])/2, (a[1]+b[1])/2, (a[2]+b[2])/2] });
+    }
+    tri(a, b, cPt, col) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute([...a, ...b, ...cPt], 3));
+      this._push(g, col, {});
+    }
+    add(geo, o = {}) { this._push(geo, o.c || [1, 1, 1], o); }
+    build() {
+      let total = 0;
+      for (const it of this.items) total += it.g.attributes.position.count;
+      const pos = new Float32Array(total * 3), norm = new Float32Array(total * 3), col = new Float32Array(total * 3);
+      let off = 0;
+      for (const it of this.items) {
+        const p = it.g.attributes.position.array, n = it.g.attributes.normal.array, cnt = it.g.attributes.position.count;
+        pos.set(p, off * 3); norm.set(n, off * 3);
+        for (let i = 0; i < cnt; i++) {
+          col[(off + i) * 3] = it.c[0]; col[(off + i) * 3 + 1] = it.c[1]; col[(off + i) * 3 + 2] = it.c[2];
+        }
+        off += cnt;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(norm, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    }
+  }
+
+  const MAT_INST = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.1 });
+  class PartBatch {
+    constructor(build, cap, o = {}) {
+      const S = new Soup(); build(S);
+      this.cap = cap; this.n = 0;
+      const m = this.mesh = new THREE.InstancedMesh(S.build(), MAT_INST, cap);
+      m.setColorAt(0, new THREE.Color(1, 1, 1));
+      m.castShadow = o.shadow !== false; m.receiveShadow = true; m.count = 0;
+      scene.add(m); PartBatch.all.push(this);
+    }
+    put(mat, flash = 0, tint = null) {
+      if (this.n >= this.cap) return;
+      const i = this.n++;
+      this.mesh.setMatrixAt(i, mat);
+      const col = new THREE.Color(tint ? tint[0] : 1, tint ? tint[1] : 1, tint ? tint[2] : 1);
+      if (flash > 0) col.lerp(new THREE.Color(1, 1, 1), flash);
+      this.mesh.setColorAt(i, col);
+    }
+    end() {
+      this.mesh.count = this.n;
+      this.mesh.visible = this.n > 0;
+      if (this.n) {
+        this.mesh.instanceMatrix.needsUpdate = true;
+        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+      }
+    }
+  }
+  PartBatch.all = [];
+
+  const _rq = new THREE.Quaternion(), _re = new THREE.Euler(), _rv = new THREE.Vector3(), _rs = new THREE.Vector3(), _rm = new THREE.Matrix4();
+  const _M = Array.from({ length: 16 }, () => new THREE.Matrix4());
+  function xf(out, parent, px, py, pz, rx, ry, rz, sx = 1, sy = 1, sz = 1) {
+    _rq.setFromEuler(_re.set(rx, ry, rz, 'XYZ'));
+    _rm.compose(_rv.set(px, py, pz), _rq, _rs.set(sx, sy, sz));
+    return parent ? out.multiplyMatrices(parent, _rm) : out.copy(_rm);
+  }
+
+  // Modelli: Gatto Graffiatore, Polipetto, Tentacolo Alato
+  const KIT = {};
+  function initModels() {
+    const fur = C(0xe8893c), furD = C(0xbd6022), cream = C(0xfbf1df), pink = [.96, .48, .58];
+    const collar = C(0xd9383a), bell = mulC(COL.gold, 1.15);
+
+    KIT.gattoBase = {
+      body: new PartBatch(S => {
+        S.sph(.38, 0, .28, -.03, fur, { sc: [1.05, .92, 1.12], w: 10, h: 7 });
+        S.cyl(.26, .46, 0, .54, .02, fur, { n: 10, rt: 1.25 });
+        S.sph(.25, 0, .48, .19, cream, { sc: [.9, 1.15, .65], w: 8, h: 6 });
+        for (const s of [-1, 1]) {
+          S.sph(.19, s * .3, .18, -.08, furD, { sc: [.85, .85, 1.25], w: 8, h: 6 });
+          S.sph(.11, s * .31, .07, .12, cream, { sc: [1.0, .65, 1.25], w: 6, h: 4 });
+        }
+        S.add(gTorus(12, .15, 5), { s: .27, p: [0, .74, .04], r: [HPI, 0, 0], c: collar });
+        S.sph(.065, 0, .72, .31, bell, { w: 6, h: 4 });
+      }, 4),
+      head: new PartBatch(S => {
+        S.sph(.36, 0, .26, .02, fur, { sc: [1.14, .95, 1.02], w: 10, h: 8 });
+        for (const s of [-1, 1]) S.sph(.14, s * .13, .17, .27, cream, { sc: [1.1, .85, .9], w: 7, h: 5 });
+        S.box(.15, .07, .08, 0, .13, .3, cream);
+        S.cone(.042, .045, 0, .21, .39, pink, { n: 4, r: [HPI, 0, 0] });
+        for (const s of [-1, 1]) {
+          S.box(.075, .016, .02, s * .042, .14, .355, COL.black, { r: [0, 0, s * .35] });
+          for (const [wy, wz] of [[.19, .31], [.155, .3]]) S.seg([s * .19, wy, wz], [s * .5, wy + .02, wz - .04], .01, .005, cream, { n: 3 });
+          S.cone(.14, .31, s * .21, .56, 0, fur, { n: 4, r: [0, 0, s * -.24] });
+          S.cone(.082, .2, s * .21, .54, .03, pink, { n: 4, r: [0, 0, s * -.24] });
+          S.sph(.072, s * .135, .28, .33, C(0x2d6a3e), { w: 7, h: 5 });
+          S.box(.024, .09, .025, s * .135, .28, .395, COL.black);
+          S.sph(.018, s * .12, .3, .4, [1, 1, 1], { w: 4, h: 3, emis: .4 });
+        }
+      }, 4),
+      paw: new PartBatch(S => {
+        S.cyl(.095, .38, 0, -.14, .08, fur, { n: 8, r: [.45, 0, 0] });
+        S.sph(.115, 0, -.28, .18, cream, { sc: [1.05, .75, 1.2], w: 7, h: 5 });
+        for (const cx of [-.055, 0, .055]) S.cone(.016, .085, cx, -.28, .31, [1, 1, 1], { n: 4, r: [HPI + .15, 0, 0], emis: .25 });
+      }, 8, { shadow: false }),
+      giantPaw: new PartBatch(S => {
+        const aura = [1.0, .94, .82], clawGlow = [.55, .96, 1.0];
+        S.sph(.28, 0, 0, -.04, aura, { sc: [1.25, .62, 1.35], w: 8, h: 6, emis: .45 });
+        S.sph(.13, 0, -.12, -.02, pink, { sc: [1.2, .4, 1.0], w: 6, h: 4, emis: .35 });
+        for (const [dx, dz] of [[-.16, .14], [-.06, .2], [.06, .2], [.16, .14]]) S.sph(.085, dx, -.02, dz, aura, { sc: [.9, .65, 1.15], w: 6, h: 4, emis: .5 });
+        for (const cx of [-.17, -.06, .06, .17]) S.cone(.036, .28, cx, -.02, .34, clawGlow, { n: 4, r: [HPI + .18, 0, 0], emis: .85 });
+      }, 4, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, .24, -.22], .075, .062, fur, { n: 6 });
+        S.seg([0, .24, -.22], [0, .56, -.16], .062, .05, furD, { n: 6 });
+        S.seg([0, .56, -.16], [0, .8, -.28], .05, .036, fur, { n: 5 });
+        S.sph(.048, 0, .83, -.3, cream, { w: 6, h: 5 });
+      }, 4, { shadow: false }),
+    };
+
+    KIT.polipetto = {
+      body: new PartBatch(S => {
+        S.sph(.24, 0, .24, 0, C(0x3a2648), { sc: [.95, 1.15, 1.1], w: 8, h: 6 });
+        S.box(.18, .09, .1, 0, .11, .16, COL.black);
+        for (const [ex, ey, ez, er] of [[-.09, .26, .18, .05], [.09, .25, .18, .045], [0, .34, .15, .058]]) {
+          S.sph(er, ex, ey, ez, C(0xb8ff38), { w: 6, h: 4, emis: .35 });
+        }
+      }, 40),
+      tentacle: new PartBatch(S => {
+        S.seg([0, 0, 0], [.18, -.03, 0], .048, .032, C(0x335c38), { n: 5 });
+        S.seg([.18, -.03, 0], [.34, .03, 0], .032, .012, C(0x63a844), { n: 5 });
+      }, 240, { shadow: false })
+    };
+
+    KIT.tentacolo = {
+      body: new PartBatch(S => {
+        S.sph(.17, 0, .03, 0, C(0x482242), { sc: [.9, 1.05, 1.25], w: 7, h: 5 });
+        S.sph(.075, 0, .05, .18, C(0xd4ff42), { w: 6, h: 5, emis: .35 });
+        S.box(.035, .1, .02, 0, .05, .25, COL.black);
+      }, 20),
+      wing: new PartBatch(S => {
+        const w1 = C(0x5a2850), w2 = C(0x31152d);
+        const pts = [[0, 0, .12], [.24, .05, .18], [.58, .03, .08], [.5, 0, -.08], [.34, 0, -.03], [.24, 0, -.18], [.12, 0, -.08], [0, 0, -.15]];
+        for (let i = 1; i < pts.length - 1; i++) {
+          S.tri(pts[0], pts[i + 1], pts[i], i & 1 ? w1 : w2);
+          S.tri(pts[0], pts[i], pts[i + 1], i & 1 ? w1 : w2);
+        }
+      }, 40, { shadow: false }),
+      tail: new PartBatch(S => {
+        S.seg([0, 0, 0], [0, -.2, -.12], .032, .02, C(0x335c38), { n: 4 });
+        S.seg([0, -.2, -.12], [0, -.38, -.22], .02, .008, C(0x63a844), { n: 4 });
+      }, 60, { shadow: false }),
+    };
+  }
+
+  function rigGattoGraffiatore(e) {
+    const K = KIT.gattoBase, s = e.scale || 1, fl = e.flash || 0, sw = e.swipe || 0;
+    const t = SH.uTime.value * 3.0 + (e.ph || 0);
+    const lunge = Math.sin(sw * PI);
+    const sq = 1 + Math.sin(t) * .025 - lunge * .08;
+    const sx = 1 / Math.sqrt(sq);
+
+    const M0 = xf(_M[0], null, e.x, e.y, e.z, lunge * .26, e.yaw, 0, s * sx, s * sq, s * sx);
+    K.body.put(M0, fl, e.tint);
+
+    const MHead = xf(_M[1], M0, 0, .78, .05, (e.pitch || 0) - lunge * .2, 0, Math.sin(t * .7) * .06);
+    K.head.put(MHead, fl, e.tint);
+
+    for (const side of [-1, 1]) {
+      const active = side === (e.pawSide || 1) ? lunge : 0;
+      const mp = xf(_M[2 + (side > 0 ? 1 : 0)], M0, side * .18, .54, .18 + active * .38, -active * 1.25, side * -active * .35, side * active * .25);
+      K.paw.put(mp, fl, e.tint);
+    }
+
+    if (sw > .01) {
+      const prog = 1 - sw;
+      const reach = Math.min(1, prog * 3.4);
+      const pulse = prog < .22 ? (.45 + .55 * (prog / .22)) : Math.max(.01, 1 - (prog - .22) / .78);
+      const dist = e.hitDist || 1.4, dy = e.hitDy !== undefined ? e.hitDy : .2;
+      const pz = lerp(.35 * s, dist, reach), py = lerp(.54 * s, dy, reach);
+      const dir = e.pawSide || 1;
+      const MRoot = xf(_M[5], null, e.x, e.y, e.z, 0, e.yaw, 0, 1, 1, 1);
+      const gs = Math.min(1.35, s) * pulse * 1.2;
+      K.giantPaw.put(xf(_M[6], MRoot, dir * .12 * (1 - reach), py, pz, -.25 + reach * .55, 0, dir * (.45 - prog * .9), gs, gs, gs * (1 + (1 - reach) * .75)), fl, null);
+    }
+
+    K.tail.put(xf(_M[4], M0, 0, .18, -.3, .12, Math.sin(t * 1.6) * .48, Math.cos(t * 1.6) * .12), fl, e.tint);
+  }
+
+  // Plinto fisso + Passerella telescopica (identica a towers.js)
+  const GANTRY_H = 0.34, GANTRY_R = 0.88, PAD_R = 0.58, REACH = 1.35;
+  let gantryRail, gantryPad;
+  function buildTowerBase() {
+    const metal = COL.iron, steel = COL.steel, dark = COL.stoneD, warnY = [.95, .78, .12];
+
+    const SP = new Soup();
+    SP.cyl(GANTRY_R + .14, .16, 0, .08, 0, dark);
+    SP.cyl(GANTRY_R, GANTRY_H, 0, GANTRY_H / 2, 0, metal, { rt: .92 });
+    for (let k = 0; k < 4; k++) {
+      const a = k * HPI + PI / 4;
+      SP.box(.26, .22, .2, Math.cos(a) * (GANTRY_R + .04), .12, Math.sin(a) * (GANTRY_R + .04), steel, { r: [0, -a + HPI, 0] });
+    }
+    const plinth = new THREE.Mesh(SP.build(), MAT_INST);
+    plinth.castShadow = plinth.receiveShadow = true;
+    scene.add(plinth);
+
+    const SR = new Soup();
+    SR.box(1.12, .12, REACH, 0, GANTRY_H - .02, REACH / 2, metal);
+    SR.box(.94, .04, REACH, 0, GANTRY_H + .055, REACH / 2, steel);
+    const nStripes = 4, sLen = REACH / nStripes;
+    for (const side of [-1, 1]) {
+      for (let s = 0; s < nStripes; s++) {
+        SR.box(.06, .1, sLen - .02, side * .58, GANTRY_H - .01, (s + .5) * sLen, (s & 1) ? COL.black : warnY);
+      }
+      SR.seg([side * .38, .1, .08], [side * .38, GANTRY_H - .04, REACH], .065, .055, steel);
+    }
+    gantryRail = new THREE.Mesh(SR.build(), MAT_INST);
+    gantryRail.castShadow = gantryRail.receiveShadow = true;
+    gantryRail.scale.z = 0.01;
+    gantryRail.visible = false;
+    scene.add(gantryRail);
+
+    const SD = new Soup();
+    SD.cyl(PAD_R + .06, .06, 0, GANTRY_H + .02, 0, metal);
+    SD.cyl(PAD_R, .08, 0, GANTRY_H + .05, 0, steel);
+    gantryPad = new THREE.Mesh(SD.build(), MAT_INST);
+    gantryPad.castShadow = gantryPad.receiveShadow = true;
+    scene.add(gantryPad);
+  }
+
+  // Scie artigli
+  const slashes = [];
+  function spawnClawSlashes(hx, hy, hz, yaw, dir) {
+    const cs = Math.cos(yaw), sn = Math.sin(yaw);
+    for (let k = -1; k <= 1; k++) {
+      const ox = cs * k * .11, oz = -sn * k * .11, oy = k * .06;
+      const p1 = new THREE.Vector3(hx - cs * .26 * dir + ox, hy + .22 + oy, hz + sn * .26 * dir + oz);
+      const p2 = new THREE.Vector3(hx + cs * .26 * dir + ox, hy - .22 + oy, hz - sn * .26 * dir + oz);
+      const mid = p1.clone().add(p2).multiplyScalar(0.5);
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.035, p1.distanceTo(p2), 0.035),
+        new THREE.MeshBasicMaterial({ color: 0xdffaff, transparent: true, opacity: 1 })
+      );
+      mesh.position.copy(mid);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p2.clone().sub(p1).normalize());
+      scene.add(mesh);
+      slashes.push({ mesh, life: 0.22, max: 0.22 });
+    }
+  }
+
+  // Flusso mostri
+  const mons = [];
+  function spawnGroundGroup(count = 4) {
+    for (let i = 0; i < count; i++) {
+      mons.push({
+        fly: false, x: -9.5 - i * 1.15 - rr(0, 0.35), y: 0.04, z: rr(2.15, 3.85),
+        spd: rr(1.75, 2.05), hp: 30, flash: 0, ph: rr(0, 6)
+      });
+    }
+  }
+  function spawnAirGroup(count = 3) {
+    for (let i = 0; i < count; i++) {
+      mons.push({
+        fly: true, x: -9.5 - i * 1.5, y: rr(2.1, 2.7), z: rr(2.1, 3.9),
+        spd: rr(1.8, 2.1), hp: 55, flash: 0, ph: rr(0, 6)
+      });
+    }
+  }
+
+  initModels();
+  buildTowerBase();
+
+  let lvl = 0, range = 4.4, holdMax = 1.2, timeScale = 1.0, autoFlow = true, stunT = 0;
+  let flowTimer = 0.6, flowStep = 0;
+  buildRangeRing(range);
+
+  const cat = { yaw: 0, pitch: 0, swipe: 0, pawSide: 1, cool: 0.2, ext: 0, holdT: 0, hitDist: 1.4, hitDy: 0.2 };
+  const SCALES = [0.86, 1.08, 1.32];
+  const LVL_NAMES = ['0 DNA (Gattino)', '1 DNA (Normale)', '2 DNA (Paffuto)'];
+  const RATES = [0.67, 0.60, 0.52], DMGS = [10, 16, 24];
+
+  // Binding UI
+  const lblState = document.getElementById('lblState');
+  const lblExt = document.getElementById('lblExt');
+  document.getElementById('btnSpawnGround').onclick = () => spawnGroundGroup(4);
+  document.getElementById('btnSpawnAir').onclick = () => spawnAirGroup(3);
+  document.getElementById('btnStun').onclick = () => { stunT = 3.0; };
+  document.getElementById('btnClear').onclick = () => { mons.length = 0; };
+  document.getElementById('btnResetCam').onclick = resetCamera;
+
+  const btnAutoFlow = document.getElementById('btnAutoFlow');
+  btnAutoFlow.onclick = () => {
+    autoFlow = !autoFlow;
+    btnAutoFlow.textContent = 'Flusso Auto: ' + (autoFlow ? 'ON' : 'OFF');
+    btnAutoFlow.classList.toggle('active', autoFlow);
+  };
+  document.getElementById('rngLvl').oninput = e => {
+    lvl = +e.target.value;
+    document.getElementById('lblLvl').textContent = LVL_NAMES[lvl];
+  };
+  document.getElementById('rngRange').oninput = e => {
+    range = +e.target.value;
+    document.getElementById('lblRange').textContent = range.toFixed(2) + ' u';
+    buildRangeRing(range);
+  };
+  document.getElementById('rngHold').oninput = e => {
+    holdMax = +e.target.value;
+    document.getElementById('lblHold').textContent = holdMax.toFixed(2) + ' s';
+  };
+  document.getElementById('rngSpeed').oninput = e => {
+    timeScale = +e.target.value;
+    document.getElementById('lblSpeed').textContent = timeScale.toFixed(2) + 'x';
+  };
+  document.getElementById('chkRing').onchange = e => { rangeRing.visible = e.target.checked; };
+
+  window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  let last = performance.now();
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
+    last = now;
+    SH.uTime.value += dt;
+
+    for (const b of PartBatch.all) b.n = 0;
+
+    // Flusso automatico a ondate alternate (Polipetti -> pausa -> Volanti -> pausa)
+    if (autoFlow) {
+      flowTimer -= dt;
+      if (flowTimer <= 0) {
+        if (flowStep % 3 === 2) {
+          spawnAirGroup(3);
+          flowTimer = 6.5;
+        } else {
+          spawnGroundGroup(flowStep % 3 === 0 ? 3 : 5);
+          flowTimer = 8.5;
+        }
+        flowStep++;
+      }
+    }
+
+    // Aggiorna mostri
+    for (let i = mons.length - 1; i >= 0; i--) {
+      const m = mons[i];
+      m.x += m.spd * dt;
+      m.flash = Math.max(0, m.flash - dt * 6);
+      m.ph += dt * (m.fly ? 13 : 8);
+      if (m.x > 10.5 || m.hp <= 0) { mons.splice(i, 1); continue; }
+
+      if (m.fly) {
+        const M0 = xf(_M[0], null, m.x, m.y + Math.sin(m.ph * .4) * .08, m.z, -.15, HPI, 0, 1.15, 1.15, 1.15);
+        KIT.tentacolo.body.put(M0, m.flash);
+        const f = Math.sin(m.ph);
+        KIT.tentacolo.wing.put(xf(_M[1], M0, .1, .04, 0, 0, 0, f * .85 + .15), m.flash);
+        KIT.tentacolo.wing.put(xf(_M[2], M0, -.1, .04, 0, 0, 0, -(f * .85 + .15), -1, 1, 1), m.flash);
+        for (let k = 0; k < 3; k++) {
+          KIT.tentacolo.tail.put(xf(_M[3 + k], M0, (k - 1) * .07, -.05, -.08, Math.sin(m.ph * .5 + k) * .25, 0, 0), m.flash);
+        }
+      } else {
+        const bob = Math.abs(Math.sin(m.ph)) * 0.04;
+        const M0 = xf(_M[0], null, m.x, m.y + bob, m.z, 0, HPI, 0, 1, 1 + Math.sin(m.ph) * 0.08, 1);
+        KIT.polipetto.body.put(M0, m.flash);
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU + 0.52, w = Math.sin(m.ph + k * 1.35);
+          KIT.polipetto.tentacle.put(xf(_M[1 + k], M0, Math.cos(a) * 0.13, 0.06, -Math.sin(a) * 0.13, 0, a + w * 0.2, 0.12 + w * 0.3), m.flash);
+        }
+      }
+    }
+
+    // Stun EMP
+    const stunned = stunT > 0;
+    if (stunned) stunT = Math.max(0, stunT - dt);
+
+    // Ricerca bersaglio (solo TERRA, regola FIRST = x maggiore)
+    let tgt = null, bestX = -1e9;
+    if (!stunned) {
+      for (const m of mons) {
+        if (m.fly) continue;
+        if (m.x * m.x + m.z * m.z <= range * range && m.x > bestX) {
+          bestX = m.x; tgt = m;
+        }
+      }
+    }
+
+    if (tgt) cat.holdT = holdMax;
+    else cat.holdT = stunned ? 0 : Math.max(0, cat.holdT - dt);
+
+    const wantExt = cat.holdT > 0 ? 1 : 0;
+    cat.ext = damp(cat.ext, wantExt, wantExt ? 12 : 5.5, dt);
+
+    gantryRail.visible = cat.ext > 0.02;
+    gantryRail.scale.z = Math.max(0.01, cat.ext);
+    gantryPad.position.z = cat.ext * REACH;
+
+    const catX = 0, catY = GANTRY_H + 0.08, catZ = cat.ext * REACH;
+    cat.swipe = Math.max(0, cat.swipe - dt * 4.2);
+    cat.cool -= dt;
+
+    if (tgt) {
+      const dx = tgt.x - catX, dz = tgt.z - catZ;
+      cat.yaw = angDamp(cat.yaw, Math.atan2(dx, dz), 14, dt);
+      cat.pitch = damp(cat.pitch, 0.12, 8, dt);
+      cat.hitDist = Math.max(0.35, Math.hypot(dx, dz));
+      cat.hitDy = (tgt.y + 0.25) - catY;
+
+      if (cat.cool <= 0 && cat.ext > 0.75) {
+        cat.cool = RATES[lvl];
+        cat.swipe = 1;
+        cat.pawSide *= -1;
+        tgt.flash = 1;
+        if (document.getElementById('chkKill').checked) tgt.hp -= DMGS[lvl];
+        spawnClawSlashes(tgt.x, tgt.y + 0.25, tgt.z, cat.yaw, cat.pawSide);
+      }
+    } else {
+      cat.yaw = angDamp(cat.yaw, Math.sin(SH.uTime.value * 0.7) * 0.55, 2.4, dt);
+      cat.pitch = damp(cat.pitch, Math.sin(SH.uTime.value * 1.2) * 0.06, 4, dt);
+      if (cat.cool < 0.2) cat.cool = 0.2;
+    }
+
+    rigGattoGraffiatore({
+      x: catX, y: catY, z: catZ, yaw: cat.yaw, pitch: cat.pitch,
+      scale: SCALES[lvl], swipe: cat.swipe, pawSide: cat.pawSide,
+      hitDist: cat.hitDist, hitDy: cat.hitDy,
+      tint: stunned ? [0.6, 0.8, 1.0] : null
+    });
+
+    // Aggiorna badge stato UI
+    if (stunned) {
+      lblState.textContent = `EMP STUN (${stunT.toFixed(1)}s)`;
+      lblState.className = 'badge stun';
+    } else if (tgt) {
+      lblState.textContent = 'ATTIVO (IN ATTACCO)';
+      lblState.className = 'badge active';
+    } else if (cat.holdT > 0) {
+      lblState.textContent = `ATTESA RIENTRO (${cat.holdT.toFixed(1)}s)`;
+      lblState.className = 'badge hold';
+    } else {
+      lblState.textContent = 'RITRATTA (IDLE)';
+      lblState.className = 'badge';
+    }
+    lblExt.textContent = `Sbalzo: ${Math.round(cat.ext * 100)}%`;
+
+    for (let i = slashes.length - 1; i >= 0; i--) {
+      const s = slashes[i];
+      s.life -= dt;
+      if (s.life <= 0) { scene.remove(s.mesh); s.mesh.geometry.dispose(); s.mesh.material.dispose(); slashes.splice(i, 1); }
+      else { s.mesh.material.opacity = s.life / s.max; s.mesh.scale.setScalar(0.7 + 0.5 * (1 - s.life / s.max)); }
+    }
+
+    for (const b of PartBatch.all) b.end();
+    renderer.render(scene, camera);
+  }
+  animate(last);
+}
+</script>
+</body>
+</html>
