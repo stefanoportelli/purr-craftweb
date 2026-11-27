@@ -2,7 +2,7 @@
 
 const R = {
   renderer: null, scene: null, cam: null, canvas: null,
-  dw: 2, dh: 2, iw: 2, ih: 2, maxIH: 620, maxPix: 690000, quality: 1, cssW: 2, cssH: 2, safe: [0, 0, 0, 0], lite: 0, opt: !HASH.noopt,
+  dw: 2, dh: 2, iw: 2, ih: 2, maxIH: 620, maxPix: 690000, quality: 1, cssW: 2, cssH: 2, safe: [0, 0, 0, 0], lite: 0, perf: false, opt: !HASH.noopt,
   viewH: 27, fitW: 45, fitTall: 33, shiftY: 0, px: 0.04,
   sub: new THREE.Vector2(), ditherOfs: new THREE.Vector2(),
   focusZ: 60, fade: 0, exposure: 1.0,
@@ -142,13 +142,13 @@ void main(){
 precision highp float; varying vec2 vUv;
 uniform sampler2D tColor; uniform sampler2D tBloomA; uniform sampler2D tBloomB;
 uniform vec4 uGrade;
-uniform vec3 uBloom;
+uniform vec3 uBloom; uniform float uBloomOn;
 uniform vec3 uLift; uniform vec2 uDither; uniform vec2 uRes;
 ${GLSL_BAYER}
 vec3 filmic(vec3 x){ x = max(x, 0.0); return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
 void main(){
   vec3 c = texture2D(tColor, vUv).rgb;
-  c += texture2D(tBloomA, vUv).rgb * uBloom.x + texture2D(tBloomB, vUv).rgb * uBloom.y;
+  if (uBloomOn > 0.5) c += texture2D(tBloomA, vUv).rgb * uBloom.x + texture2D(tBloomB, vUv).rgb * uBloom.y;
   c *= uGrade.x;
   vec2 q = (vUv - 0.5) * vec2(1.0, 0.92);
   float vig = smoothstep(0.9, 0.3, length(q) * 1.25);
@@ -163,7 +163,7 @@ void main(){
   gl_FragColor = vec4(c, 1.0);
 }`, {
     tColor: { value: null }, tBloomA: { value: null }, tBloomB: { value: null },
-    uGrade: { value: new THREE.Vector4(1.0, 0.92, 0.55, 1.0) }, uBloom: { value: new THREE.Vector3(0.35, 0.5, 28) },
+    uGrade: { value: new THREE.Vector4(1.0, 0.92, 0.55, 1.0) }, uBloom: { value: new THREE.Vector3(0.35, 0.5, 28) }, uBloomOn: { value: 1.0 },
     uLift: { value: new THREE.Vector3(0.010, 0.016, 0.030) }, uDither: { value: R.ditherOfs }, uRes: { value: new THREE.Vector2() },
   });
 
@@ -202,11 +202,18 @@ function resizeRenderer() {
   };
   const HF = THREE.HalfFloatType, NE = THREE.NearestFilter, LI = THREE.LinearFilter;
   R.rt.scene = mk(iw, ih, HF, NE, true);
-  R.rt.atmo = mk(iw, ih, HF, NE, false);
-  R.rt.dof = mk(iw, ih, HF, LI, false);
-  const bw = Math.max(4, iw >> 1), bh = Math.max(4, ih >> 1), cw = Math.max(2, iw >> 2), ch = Math.max(2, ih >> 2);
-  R.rt.bA = mk(bw, bh, HF, LI, false); R.rt.bA2 = mk(bw, bh, HF, LI, false);
-  R.rt.bB = mk(cw, ch, HF, LI, false); R.rt.bB2 = mk(cw, ch, HF, LI, false);
+  if (R.perf) {
+    R.rt.atmo = mk(2, 2, HF, NE, false);
+    R.rt.dof = mk(2, 2, HF, LI, false);
+    R.rt.bA = mk(2, 2, HF, LI, false); R.rt.bA2 = mk(2, 2, HF, LI, false);
+    R.rt.bB = mk(2, 2, HF, LI, false); R.rt.bB2 = mk(2, 2, HF, LI, false);
+  } else {
+    R.rt.atmo = mk(iw, ih, HF, NE, false);
+    R.rt.dof = mk(iw, ih, HF, LI, false);
+    const bw = Math.max(4, iw >> 1), bh = Math.max(4, ih >> 1), cw = Math.max(2, iw >> 2), ch = Math.max(2, ih >> 2);
+    R.rt.bA = mk(bw, bh, HF, LI, false); R.rt.bA2 = mk(bw, bh, HF, LI, false);
+    R.rt.bB = mk(cw, ch, HF, LI, false); R.rt.bB2 = mk(cw, ch, HF, LI, false);
+  }
   R.rt.final = mk(iw, ih, THREE.UnsignedByteType, LI, false);
   const hud = document.getElementById('hud'); hud.width = dw; hud.height = dh;
 }
@@ -215,14 +222,50 @@ function fsPass(mat, target) {
   R.fsMesh.material = mat; R.renderer.setRenderTarget(target); R.renderer.render(R.fsScene, R.fsCam);
 }
 
+function setPerfMode(on, silent) {
+  R.perf = !!on;
+  R.lite = R.perf ? 1 : 0;
+  const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  R.quality = R.perf ? 0.62 : ((coarse && !HASH.noscale) ? 0.85 : 1.0);
+  if (typeof LT !== 'undefined' && LT.moon && LT.moon.shadow) {
+    const sz = R.perf ? 1024 : 2048;
+    if (LT.moon.shadow.mapSize.x !== sz) {
+      LT.moon.shadow.mapSize.set(sz, sz);
+      if (LT.moon.shadow.map) { LT.moon.shadow.map.dispose(); LT.moon.shadow.map = null; }
+    }
+  }
+  if (R.renderer) resizeRenderer();
+  if (!silent) {
+    try { localStorage.setItem('purrcraft.perf', R.perf ? '1' : '0'); } catch (e) {}
+  }
+  return R.perf;
+}
+R.setPerf = setPerfMode;
+
 const _ivp = new THREE.Matrix4();
 function renderFrame() {
   const r = R.renderer, M = R.mats, T = R.rt, cam = R.cam;
   r.info.reset();
   scheduleShadows(G.phase === 'crumble' || G.phase === 'rise');
   r.setRenderTarget(T.scene); r.render(R.scene, cam);
+  let u;
+  if (R.perf) {
+    // Modalita Lite: salta SSAO, nebbia volumetrica, DoF (40 tap) e i 7 passaggi di Bloom
+    u = M.comp.uniforms;
+    u.tColor.value = T.scene.texture;
+    u.tBloomA.value = T.bA.texture;
+    u.tBloomB.value = T.bB.texture;
+    u.uBloomOn.value = 0.0;
+    u.uGrade.value.x = R.exposure; u.uGrade.value.w = R.fade; u.uRes.value.set(R.iw, R.ih);
+    fsPass(M.comp, T.final);
+    u = M.up.uniforms;
+    u.tColor.value = T.final.texture; u.uTex.value.set(R.iw, R.ih); u.uOut.value.set(R.dw, R.dh);
+    u.uGrain.value = 0.0; u.uSeed.value = 0.0;
+    fsPass(M.up, null);
+    return;
+  }
   const px = M.atmo.uniforms.uPx.value.set(1 / R.iw, 1 / R.ih);
-  let u = M.atmo.uniforms;
+  u = M.atmo.uniforms;
   u.tColor.value = T.scene.texture; u.tDepth.value = T.scene.depthTexture;
   _ivp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).invert(); u.uInvVP.value.copy(_ivp);
   cam.getWorldDirection(u.uCamDir.value);
@@ -245,8 +288,10 @@ function renderFrame() {
   u.tColor.value = T.bB.texture; u.uDir.value.set(1.6 / T.bB.width, 0); fsPass(M.blur, T.bB2);
   u.tColor.value = T.bB2.texture; u.uDir.value.set(0, 1.6 / T.bB.height); fsPass(M.blur, T.bB);
   u = M.comp.uniforms; u.tColor.value = T.dof.texture; u.tBloomA.value = T.bA.texture; u.tBloomB.value = T.bB.texture;
+  u.uBloomOn.value = 1.0;
   u.uGrade.value.x = R.exposure; u.uGrade.value.w = R.fade; u.uRes.value.set(R.iw, R.ih);
   fsPass(M.comp, T.final);
-  u = M.up.uniforms; u.tColor.value = T.final.texture; u.uTex.value.set(R.iw, R.ih); u.uOut.value.set(R.dw, R.dh); u.uSeed.value = (SH.uTime.value * 60 % 1000) * 7.13;
+  u = M.up.uniforms; u.tColor.value = T.final.texture; u.uTex.value.set(R.iw, R.ih); u.uOut.value.set(R.dw, R.dh);
+  u.uGrain.value = 0.035; u.uSeed.value = (SH.uTime.value * 60 % 1000) * 7.13;
   fsPass(M.up, null);
 }

@@ -369,6 +369,28 @@ const PX = (() => {
       'oksko',
       '.ooo.',
     ],
+    starOn: [
+      '....o....',
+      '...oYo...',
+      '..oYYYo..',
+      'ooYYYYYoo',
+      '.oYYYYYo.',
+      '..oYYYo..',
+      '.oYY.YYo.',
+      '.oYo.oYo.',
+      '..o...o..',
+    ],
+    starOff: [
+      '....o....',
+      '...oko...',
+      '..oksko..',
+      'ookkkkoo.',
+      '.okkkko..',
+      '..oksko..',
+      '.oks.sko.',
+      '.oko.oko.',
+      '..o...o..',
+    ],
   };
 
   const iconMeta = {};
@@ -528,6 +550,7 @@ const UI = (() => {
       else if (k === 'Tab') { cycleSpeed(); e.preventDefault(); }
       else if (k === '0') { camReset(); }
       else if (k === 'm' || k === 'M') { setMute(!AU.muted); }
+      else if (k === 'l' || k === 'L') { togglePerf(); }
       else if (k === '+' || k === '=') { camZoomBy(1.4); }
       else if (k === '-' || k === '_') { camZoomBy(1 / 1.4); }
       else if (k === 'c' || k === 'C') { toggleCommand(); }
@@ -538,6 +561,13 @@ const UI = (() => {
   function togglePause() { G.paused = !G.paused; sfx('uiClick', CAM.x, CAM.z, .6); }
   function cycleSpeed() { G.speed = G.speed % 3 + 1; if (G.paused) G.paused = false; sfx('uiClick', CAM.x, CAM.z, .6); }
   function soundTap() { if (AU.ready && U.sndArmed) setMute(!AU.muted); }
+  function togglePerf() {
+    if (typeof setPerfMode !== 'function') return;
+    const on = setPerfMode(!R.perf, false);
+    U.banner(on ? 'Grafica Lite: ON' : 'Grafica HD: ON', 1.5, false);
+    sfx('uiClick', CAM.x, CAM.z, .6);
+    buzz(8);
+  }
   U.sawMonster = type => { if (G.seen[type]) return; G.seen[type] = 1; if (MON[type].tip && U.tips.length < 4) U.tips.push(type); };
   U.keepAwake = () => { try { if (navigator.wakeLock && !document.hidden && (!U.wake || U.wake.released)) navigator.wakeLock.request('screen').then(w => { U.wake = w; }, () => {}); } catch (e) {} };
   U.dropTouches = () => { U.ptrs.clear(); U.gest = null; U.press = null; if (U.touch) U.inside = false; };
@@ -695,10 +725,10 @@ const UI = (() => {
     }
     const wn = 'Wave ' + Math.max(1, waveNumber()), callable = G.phase === 'play' && !G.spawning && !G.bossWave && G.nextIn > .4;
     let sub, frac = -1;
-    if (G.phase === 'play') { if (!G.spawning && !G.bossWave && G.nextIn > 0) { sub = callable && (tch || over(U.waveRect ? U.waveRect.x : -1, U.waveRect ? U.waveRect.y : -1, U.waveRect ? U.waveRect.w : 0, U.waveRect ? U.waveRect.h : 0)) ? (tch ? 'Tap to call · +' : 'Call now · +') + Math.round(G.nextIn * 3) : 'Next wave in ' + Math.ceil(G.nextIn); frac = 1 - G.nextIn / 6.5; } else { const n = G.mons.length + G.queue.length; sub = n + ' on the road'; } }
-    else sub = G.phase === 'defeat' ? 'The fire has died' : G.phase === 'clear' ? 'Boss defeated' : 'A new pass awaits';
+    if (G.phase === 'play') { if (!G.spawning && !G.bossWave && G.nextIn > 0) { sub = callable && (tch || over(U.waveRect ? U.waveRect.x : -1, U.waveRect ? U.waveRect.y : -1, U.waveRect ? U.waveRect.w : 0, U.waveRect ? U.waveRect.h : 0)) ? (tch ? 'Chiama subito · +' : 'Chiama ora · +') + Math.round(G.nextIn * 3) : 'Prossima tra ' + Math.ceil(G.nextIn) + 's'; frac = 1 - G.nextIn / 6.5; } else { const n = G.mons.length + G.queue.length; sub = n + ' in marcia'; } }
+    else sub = G.phase === 'defeat' ? 'Nucleo esaurito' : G.phase === 'clear' ? 'Boss sconfitto' : 'Nuova mappa in arrivo';
     const bw = PX.iconSize('banner')[0] * s, wW = Math.max(bw + 3 * s + tw(wn), tw(sub), tw('Next wave in 0'), tw('Tap to call · +00')) + pad * 2 + 4 * s, hW = LH * 2 + pad * 2 + s;
-    const you = U.playerActive(), ct = you ? 'You command' : 'AI commander', cs = tch ? (you ? 'Tap for the AI' : 'Tap a pad to play') : (you ? 'Click here for the AI' : 'Click a pad to take over');
+    const you = U.playerActive(), ct = you ? 'Comando Manuale' : 'Comandante IA', cs = tch ? (you ? 'Tocca per IA' : 'Tocca piazzola') : (you ? 'Click per IA' : 'Click su piazzola');
     const ic = you ? 'hand' : 'helm', icw = PX.iconSize(ic)[0] * s, cW = Math.max(icw + 3 * s + tw(ct), tw(cs)) + pad * 2 + 2 * s, xc = Wr - cW - 5 * s, g3 = 3 * s;
     const xw = Math.round(W / 2 - wW / 2);
     let yc = y0, yw = y0;
@@ -729,9 +759,10 @@ const UI = (() => {
     sq('pause', xl, zb, togglePause, G.paused ? 'Resume (P)' : 'Pause (P)', bars, G.paused); xl += zb + g3;
     sq('speed', xl, zb, cycleSpeed, 'Speed (Tab)', label(G.speed + 'x', G.speed > 1 ? COLR.amber : COLR.tx), G.speed > 1); xl += zb + g3;
     { const on = AU.ready && !AU.muted, icn = on ? 'sound' : 'mute', k = Math.max(s, Math.floor(zb / 14)), [iw2, ih2] = PX.iconSize(icn), lbl = tch ? 'Tap for sound' : 'Click for sound', wl = iw2 * s + 3 * s + tw(lbl) + pad * 2;
-      const wide = !AU.ready && xl + wl + g3 + rightW + 5 * s + iR <= W;
+      const wide = !AU.ready && xl + wl + g3 + zb + g3 + rightW + 5 * s + iR <= W;
       U.soundRect = sq('sound', xl, wide ? wl : zb, soundTap, AU.ready ? (AU.muted ? 'Sound is off (M)' : 'Sound is on (M)') : 'Sound', (x, y) => { if (wide) { PX.icon(c, icn, x + pad, y + Math.round((zb - ih2 * s) / 2), s, .85); text(lbl, x + pad + iw2 * s + 3 * s, y + Math.round((zb - LH) / 2) + s, COLR.tx); } else PX.icon(c, icn, x + Math.round((zb - iw2 * k) / 2), y + Math.round((zb - ih2 * k) / 2), k, AU.ready ? 1 : .8); }, !AU.ready);
       xl += (wide ? wl : zb) + g3; }
+    sq('perf', xl, zb, togglePerf, R.perf ? 'Grafica Lite: ON (L)' : 'Grafica HD · clicca per Lite (L)', label(R.perf ? 'LT' : 'HD', R.perf ? COLR.cold : COLR.tx), R.perf); xl += zb + g3;
     let xr = Wr - 5 * s - zb; const cur = camZoomNow();
     if (nR === 3) { sq('full', xr, zb, toggleFull, 'Full screen', corners, false); xr -= zb + g3; }
     sq('zin', xr, zb, () => camZoomBy(1.5), 'Zoom in (+)', glyph('+', cur < 2.99 ? COLR.tx : '#5a5448'), false); xr -= zb + g3;
@@ -745,7 +776,7 @@ const UI = (() => {
     if (tipB && !tch) { const w = tw(tipB.tip) + pad * 2, x = clamp(Math.round(tipB.x - w / 2), 4 * s + iL, Wr - w - 4 * s); plate(x, yB - g3 - hB, w, hB, { bd: COLR.bdHi }); text(tipB.tip, x + pad, yB - g3 - hB + pad - s, COLR.tx); yUp = Math.min(yUp, yB - g3 - hB - g3); }
     const wrap = (str, maxW) => { const out = []; let cur2 = ''; for (const wd of str.split(' ')) { const t = cur2 ? cur2 + ' ' + wd : wd; if (cur2 && tw(t) > maxW) { out.push(cur2); cur2 = wd; } else cur2 = t; } if (cur2) out.push(cur2); return out; };
     const boxW = Wr - iL - 10 * s;
-    if (G.paused) { const k = s + 1, t1 = 'Paused', w = PX.measure(t1) * k + pad * 4, h = PX.LINE * k + pad * 2; plate(Math.round(W / 2 - w / 2), yUp - h, w, h, { bd: COLR.bdHi }); PX.text(c, t1, W / 2, yUp - h + pad, k, COLR.amber, { align: 'c' }); yUp -= h + g3; }
+    if (G.paused && !G.summary) { const k = s + 1, t1 = 'In Pausa', w = PX.measure(t1) * k + pad * 4, h = PX.LINE * k + pad * 2; plate(Math.round(W / 2 - w / 2), yUp - h, w, h, { bd: COLR.bdHi }); PX.text(c, t1, W / 2, yUp - h + pad, k, COLR.amber, { align: 'c' }); yUp -= h + g3; }
     if (U.tip && !U.menu) {
       const d = MON[U.tip.type], a = sat(Math.min(U.tip.t * 4, (5.2 - U.tip.t) * 2)), head = (d.boss ? 'Boss: ' : 'New: ') + d.name, lines = wrap(d.tip, Math.min(boxW - pad * 2, 46 * 6 * s));
       let w = tw(head); for (const l of lines) w = Math.max(w, tw(l)); w += pad * 2; const h = LH * (lines.length + 1) + pad * 2 - s, x = Math.round((iL + Wr - w) / 2), y = yUp - h;
@@ -875,6 +906,85 @@ const UI = (() => {
         c.globalAlpha = a; plate(Math.round(W / 2 - w / 2), yy, w, h); PX.text(c, t1, W / 2, yy + pad, sc, '#ffd9a8', { align: 'c' }); t2.forEach((l, k) => text(l, W / 2, yy + pad + PX.LINE * sc + s + k * LH, k === 0 && t2.length > 1 ? COLR.tx : COLR.dim, { align: 'c' })); c.globalAlpha = 1;
       }
     }
+    if (G.summary && (G.phase === 'clear' || G.phase === 'defeat')) {
+      const sm = G.summary;
+      const titleTxt = sm.won ? ('Livello ' + sm.level + ' Superato!') : 'Difesa Violata';
+      const titleCol = sm.won ? COLR.amber : COLR.red;
+      const hpLine = 'HP Nucleo: ' + sm.lives + '/' + sm.maxLives + (sm.won ? (' (' + Math.round(sm.lives * 100 / sm.maxLives) + '%)') : (' · Wave ' + sm.wave));
+      const stLine = 'Abbattuti: ' + sm.slain + ' · DNA: ' + sm.dna;
+      const tierTip = sm.won
+        ? (sm.stars === 3 ? 'Valutazione Perfetta: 3/3 Stelle!' : (sm.stars === 2 ? '3 Stelle: chiudi al 100% HP' : '2 Stelle: chiudi con >=80% HP'))
+        : 'Potenzia Fuoco vs Terra e Laser vs Aria';
+
+      const bRetryLbl = 'Rigioca';
+      const bNextLbl = 'Livello ' + (sm.level + 1);
+      const bRestartLbl = 'Nuova Run';
+      const btnH = (tch ? 26 : 20) * s;
+      const maxTxtW = Math.max(
+        PX.measure(titleTxt) * (s + 2),
+        tw(hpLine),
+        tw(stLine),
+        tw(tierTip),
+        (tw(bRetryLbl) + tw(bNextLbl) + 18 * s)
+      );
+      const cardW = Math.min(Wr - iL - 10 * s, maxTxtW + pad * 4);
+      const starSz = Math.max(2, s + 1);
+      const [stW, stH] = PX.iconSize('starOn');
+      const starsRowW = 3 * stW * starSz + 2 * 4 * s;
+      const hasStars = sm.won ? (stH * starSz + 4 * s) : 0;
+      const cardH = pad * 2 + PX.LINE * (s + 2) + 3 * s + hasStars + LH * 3 + 6 * s + btnH;
+      const cx = Math.round((iL + Wr - cardW) / 2);
+      const cy = Math.round(clamp((H - cardH) * .46, y0 + topH + 6 * s, Hb - cardH - 6 * s));
+
+      U.menuRect = { x: cx, y: cy, w: cardW, h: cardH };
+      plate(cx, cy, cardW, cardH, { bg: 'rgba(10,14,23,0.97)', bd: sm.won ? COLR.bdHi : COLR.red, hi: sm.won ? 'rgba(232,176,74,0.2)' : 'rgba(229,85,60,0.16)' });
+
+      let curY = cy + pad;
+      PX.text(c, titleTxt, cx + cardW / 2, curY, s + 2, titleCol, { align: 'c' });
+      curY += PX.LINE * (s + 2) + 3 * s;
+
+      if (sm.won) {
+        const sx0 = Math.round(cx + (cardW - starsRowW) / 2);
+        for (let i = 0; i < 3; i++) {
+          const on = i < sm.stars;
+          PX.icon(c, on ? 'starOn' : 'starOff', sx0 + i * (stW * starSz + 4 * s), curY, starSz, on ? 1 : 0.75);
+        }
+        curY += stH * starSz + 5 * s;
+      }
+
+      text(hpLine, cx + cardW / 2, curY, COLR.tx, { align: 'c' }); curY += LH + s;
+      text(stLine, cx + cardW / 2, curY, COLR.dim, { align: 'c' }); curY += LH + s;
+      text(tierTip, cx + cardW / 2, curY, sm.won ? COLR.ok : COLR.amber, { align: 'c' }); curY += LH + 5 * s;
+
+      const by = cy + cardH - pad - btnH;
+      if (sm.won) {
+        const gapB = 5 * s;
+        const bw2 = Math.floor((cardW - pad * 2 - gapB) / 2);
+        const addSumBtn = (bx, id, lbl, primary, fn) => {
+          const ov = over(bx, by, bw2, btnH);
+          const b = { id, fn, x: bx, y: by, w: bw2, h: btnH };
+          U.btns.push(b); if (ov) hot = b;
+          const dn = U.press === id, lit = ov || dn;
+          plate(bx, by + (dn ? s : 0), bw2, btnH, {
+            bg: lit ? COLR.bg2 : (primary ? '#1c2b20' : 'rgba(16,18,27,0.96)'),
+            bd: lit ? COLR.bdHi : (primary ? '#69a86b' : COLR.bd),
+          });
+          text(lbl, bx + bw2 / 2, by + Math.round((btnH - LH) / 2) + (dn ? s : 0) + s * .5, primary ? COLR.ok : COLR.tx, { align: 'c' });
+        };
+        addSumBtn(cx + pad, 'sumRetry', bRetryLbl, false, () => { replayCurrentLevel(); sfx('uiClick', CAM.x, CAM.z, .7); });
+        addSumBtn(cx + pad + bw2 + gapB, 'sumNext', bNextLbl, true, () => { nextLevelBattle(); sfx('uiClick', CAM.x, CAM.z, .8); });
+      } else {
+        const bw1 = Math.min(cardW - pad * 2, tw(bRestartLbl) + 24 * s);
+        const bx = Math.round(cx + (cardW - bw1) / 2);
+        const ov = over(bx, by, bw1, btnH);
+        const b = { id: 'sumFailRetry', fn: () => { replayCurrentLevel(); sfx('uiClick', CAM.x, CAM.z, .7); }, x: bx, y: by, w: bw1, h: btnH };
+        U.btns.push(b); if (ov) hot = b;
+        const dn = U.press === 'sumFailRetry', lit = ov || dn;
+        plate(bx, by + (dn ? s : 0), bw1, btnH, { bg: lit ? COLR.bg2 : 'rgba(22,25,36,0.98)', bd: lit ? COLR.bdHi : COLR.amber });
+        text(bRestartLbl, bx + bw1 / 2, by + Math.round((btnH - LH) / 2) + (dn ? s : 0) + s * .5, COLR.amber, { align: 'c' });
+      }
+    }
+
     if (HASH.fps) { text(R.fpsText || '', 6 * s + iL, Hb - 30 * s, COLR.ok, { outline: COLR.dark }); }
   }
   U.init = initUI; U.update = update; U.draw = draw;

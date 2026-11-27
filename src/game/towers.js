@@ -1,14 +1,16 @@
 'use strict';
 
 const G = {
-  B: null, t: 0, gold: 0, lives: 20, maxLives: 20, wave: 0, slain: 0, level: 0, run: 1,
+  B: null, t: 0, gold: 0, lives: 100, maxLives: 100, wave: 0, slain: 0, level: 0, run: 1, dnaAcc: 0,
   towers: [], mons: [], men: [], arrows: [], shells: [], stuck: [], beams: [], hbars: [], phase: 'play',
 };
 
-const DNA_COSTS = [50, 30, 50, 80, 120];
+const _BC = typeof BAL !== 'undefined' ? BAL.cfg : null;
+const DNA_COSTS = _BC ? [Math.round(_BC.cost0), Math.round(_BC.cost1), Math.round(_BC.cost2), Math.round(_BC.cost3), Math.round(_BC.cost4)] : [50, 30, 50, 80, 120];
 const DNA_SCALES = [.86, 1.0, 1.15, 1.32, 1.50];
 
 function catProfile(dna) {
+  const C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
   const n = dna ? dna.length : 0;
   let f = 0, e = 0;
   if (dna) for (let i = 0; i < n; i++) { if (dna[i] === 'fire') f++; else if (dna[i] === 'elec') e++; }
@@ -17,15 +19,23 @@ function catProfile(dna) {
   if (n === 0) {
     return {
       name: 'Gatto Graffiatore', tag: 'TERRA', model: 'base',
-      air: false, ground: true, dmg: 10, rate: .67, range: 4.4, splash: 0, scale,
+      air: false, ground: true,
+      dmg: C ? C.baseDmg : 10,
+      rate: C ? C.baseRate : .67,
+      range: C ? C.baseRange : 4.4,
+      splash: 0, scale,
       light: 45, col: [1.0, .82, .55]
     };
   }
-  // 2x2 Ibrido Bilanciato: Gatto Plasma (Solo ARIA, burst pesante 480 HP)
+  // 2x2 Ibrido Bilanciato: Gatto Plasma (Solo ARIA, burst pesante)
   if (f === 2 && e === 2) {
     return {
       name: 'Gatto Plasma', tag: 'ARIA', model: 'elec', plasma: true,
-      air: true, ground: false, dmg: 480, rate: 2.0, range: 8.5, splash: 0, scale,
+      air: true, ground: false,
+      dmg: C ? C.plasmaDmg : 480,
+      rate: C ? C.plasmaRate : 2.0,
+      range: C ? C.plasmaRange : 8.5,
+      splash: 0, scale,
       light: 92, col: [.95, .48, 1.0]
     };
   }
@@ -33,15 +43,23 @@ function catProfile(dna) {
   if (f === 3 && e === 1) {
     return {
       name: 'Magma Volt', tag: 'TERRA', model: 'fire', miniStun: true,
-      air: false, ground: true, dmg: 135, rate: .4, range: 6.6, splash: 1.55, scale,
-      light: 85, col: [1.0, .62, .25]
+      air: false, ground: true,
+      dmg: C ? C.magmaDmg : 135,
+      rate: C ? C.magmaRate : .4,
+      range: C ? C.magmaRange : 6.6,
+      splash: C ? C.magmaSplash : 1.55,
+      scale, light: 85, col: [1.0, .62, .25]
     };
   }
   // 3x1 Dominanza Elettrico + 1 Fuoco: Cyborg Pirotecnico
   if (e === 3 && f === 1) {
     return {
       name: 'Cyborg Pirotecnico', tag: 'ARIA', model: 'elec', burnBonus: true,
-      air: true, ground: false, dmg: 175, rate: .38, range: 7.5, splash: 0, scale,
+      air: true, ground: false,
+      dmg: C ? C.pyroDmg : 175,
+      rate: C ? C.pyroRate : .38,
+      range: C ? C.pyroRange : 7.5,
+      splash: 0, scale,
       light: 85, col: [.45, .88, 1.0]
     };
   }
@@ -52,10 +70,10 @@ function catProfile(dna) {
     return {
       name: e > 0 ? 'Gatto Fuoco (Ibrido)' : names[k], tag: 'TERRA', model: 'fire',
       air: false, ground: true,
-      dmg: [0, 30, 65, 120, 220][k],
-      rate: [0, .67, .5, .4, .286][k],
-      range: [0, 5.2, 5.8, 6.4, 7.2][k],
-      splash: [0, 1.0, 1.2, 1.5, 2.0][k],
+      dmg: C ? [0, C.fireDmg1, C.fireDmg2, C.fireDmg3, C.fireDmg4][k] : [0, 30, 65, 120, 220][k],
+      rate: C ? [0, C.fireRate1, C.fireRate2, C.fireRate3, C.fireRate4][k] : [0, .67, .5, .4, .286][k],
+      range: C ? [0, C.fireRange1, C.fireRange2, C.fireRange3, C.fireRange4][k] : [0, 5.2, 5.8, 6.4, 7.2][k],
+      splash: C ? [0, C.fireSplash1, C.fireSplash2, C.fireSplash3, C.fireSplash4][k] : [0, 1.0, 1.2, 1.5, 2.0][k],
       scale, light: [45, 55, 65, 75, 92][k], col: [1.0, .52, .22]
     };
   }
@@ -65,9 +83,9 @@ function catProfile(dna) {
   return {
     name: f > 0 ? 'Gatto Laser (Ibrido)' : names[k], tag: 'ARIA', model: 'elec',
     air: true, ground: false,
-    dmg: [0, 35, 80, 150, 260][k],
-    rate: [0, .67, .5, .4, .286][k],
-    range: [0, 5.8, 6.5, 7.3, 8.5][k],
+    dmg: C ? [0, C.elecDmg1, C.elecDmg2, C.elecDmg3, C.elecDmg4][k] : [0, 35, 80, 150, 260][k],
+    rate: C ? [0, C.elecRate1, C.elecRate2, C.elecRate3, C.elecRate4][k] : [0, .67, .5, .4, .286][k],
+    range: C ? [0, C.elecRange1, C.elecRange2, C.elecRange3, C.elecRange4][k] : [0, 5.8, 6.5, 7.3, 8.5][k],
     splash: 0, scale, light: [45, 56, 66, 78, 95][k], col: [.35, .82, 1.0]
   };
 }

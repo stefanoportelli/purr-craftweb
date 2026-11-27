@@ -2,8 +2,59 @@
 
 Object.assign(G, {
   press: 1, bountyMul: 1, dmgMul: 1, waveKills: 0, waveLeaks: 0, leaks: 0, leakTypes: {}, slowmo: 0, bossDown: false,
-  queue: [], waveT: 0, nextIn: 0, spawning: false, bossWave: false, bossAlive: false, k: 0, phaseT: 0, banner: null, started: false, timeScale: 1, trickle: 0, clearT: 0, paused: true, speed: 1, best: 0, seen: {},
+  queue: [], waveT: 0, nextIn: 0, spawning: false, bossWave: false, bossAlive: false, k: 0, phaseT: 0, banner: null, started: false, timeScale: 1, trickle: 0, clearT: 0, paused: true, speed: 1, best: 0, seen: {}, summary: null, starsByLevel: {},
 });
+
+function computeRunStars(won, lives, maxLives) {
+  if (!won || maxLives <= 0) return 0;
+  if (lives >= maxLives) return 3;
+  if (lives >= maxLives * 0.8) return 2;
+  return 1;
+}
+
+function recordRunSummary(won) {
+  const stars = computeRunStars(won, G.lives, G.maxLives);
+  const lvlKey = 'L' + (G.level + 1);
+  let bestStars = stars;
+  try {
+    const raw = JSON.parse(localStorage.getItem('purrcraft.stars') || '{}');
+    const prev = raw[lvlKey] || 0;
+    bestStars = Math.max(prev, stars);
+    raw[lvlKey] = bestStars;
+    localStorage.setItem('purrcraft.stars', JSON.stringify(raw));
+    G.starsByLevel = raw;
+  } catch (e) {}
+  G.summary = {
+    won,
+    stars,
+    bestStars,
+    level: G.level + 1,
+    wave: Math.max(1, waveNumber()),
+    lives: Math.max(0, Math.round(G.lives)),
+    maxLives: Math.max(1, Math.round(G.maxLives)),
+    slain: G.slain || 0,
+    dna: Math.floor(G.gold || 0),
+    leaks: G.leaks || 0,
+  };
+  return G.summary;
+}
+
+function replayCurrentLevel() {
+  if (!G.B) return;
+  G.summary = null;
+  G.advance = false;
+  if (typeof BAL !== 'undefined' && typeof BAL.restartBattle === 'function') {
+    BAL.restartBattle();
+    return;
+  }
+  beginBattle(false);
+}
+
+function nextLevelBattle() {
+  G.summary = null;
+  G.advance = true;
+  setPhase('crumble');
+}
 
 function waveNumber() { return G.level * 5 + (G.phase === 'rise' ? 1 : Math.max(1, G.k)); }
 
@@ -186,8 +237,20 @@ function aiThink(dt) {
 
 function setPhase(p) {
   G.phase = p; G.phaseT = 0;
-  if (p === 'clear') { G.advance = true; UI.banner('The pass holds', 3.2, false); UI.closeMenu(); }
-  if (p === 'defeat') { UI.banner('The beacon is out', 4.2, true); UI.closeMenu(); sfx('beaconOut', G.B.beacon.x, G.B.beacon.z, 1.2); fxEmbers(G.B.beacon.x, G.B.beacon.y, G.B.beacon.z, 60, .8); for (let i = 0; i < 14; i++) fxSmoke(G.B.beacon.x + rr(-.4, .4), G.B.beacon.y + rr(0, 1), G.B.beacon.z + rr(-.4, .4), rr(-.3, .3), rr(.8, 2), rr(-.3, .3), rr(2, 4), 1, 2, .2, .2, .22, .6, { drag: .5, rise: .2 }); }
+  if (p === 'clear') {
+    G.advance = true;
+    const sm = recordRunSummary(true);
+    UI.banner('Livello ' + sm.level + ' Completato · ' + '★'.repeat(sm.stars) + '☆'.repeat(3 - sm.stars), 3.0, false);
+    UI.closeMenu();
+  }
+  if (p === 'defeat') {
+    const sm = recordRunSummary(false);
+    UI.banner('Nucleo Spento · Wave ' + sm.wave, 3.2, true);
+    UI.closeMenu();
+    sfx('beaconOut', G.B.beacon.x, G.B.beacon.z, 1.2);
+    fxEmbers(G.B.beacon.x, G.B.beacon.y, G.B.beacon.z, 60, .8);
+    for (let i = 0; i < 14; i++) fxSmoke(G.B.beacon.x + rr(-.4, .4), G.B.beacon.y + rr(0, 1), G.B.beacon.z + rr(-.4, .4), rr(-.3, .3), rr(.8, 2), rr(-.3, .3), rr(2, 4), 1, 2, .2, .2, .22, .6, { drag: .5, rise: .2 });
+  }
   if (p === 'crumble') startCrumble();
   if (p === 'rise') startRise();
 }
@@ -209,6 +272,7 @@ function startCrumble() {
   sfx('crumble', 0, 0, 1.3); FX.shake = 1.2;
 }
 function startRise() {
+  G.summary = null;
   if (G.B) { for (const t of G.towers) { t.clearModel(false); } G.towers.length = 0; clearDebris(); disposeBoard(G.B); }
   for (let i = 0; i < LT.emitters.length; i++) LT.emitters[i] = null;
   const B = G.B = buildBoard(G.boardSeed++, G.boardIndex++);
@@ -227,6 +291,7 @@ function activateBoard(B, lit) {
   G.padCov = null;
 }
 function beginBattle(first) {
+  G.summary = null;
   const B = G.B, C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
   if (typeof BAL !== 'undefined') BAL.sync(false);
   G.maxLives = C ? Math.max(1, Math.round(C.baseHp)) : 100;
@@ -250,10 +315,12 @@ function updatePhase(dt) {
   LT.beaconLevel = damp(LT.beaconLevel, G.lives / G.maxLives, 3, dt);
   if (B.beaconFlame) { const f = B.beaconFlame, lv = LT.beaconLevel; f.on = LT.beaconOn; f.size = 2.35 * (.42 + .58 * lv) * (1 - .32 * LT.beaconGutter); f.embers = 1 + 2 * lv + 6 * LT.beaconGutter; }
   for (let i = 1; i < B.flames.length; i++) B.flames[i].on = LT.beaconOn;
-  if (G.phase === 'clear') { if (t > 2.6) setPhase('crumble'); }
+  if (G.phase === 'clear') {
+    if (G.autoAdvanceSummary && t > 3.2) setPhase('crumble');
+  }
   else if (G.phase === 'defeat') {
     for (const tw of G.towers) { tw.em.on = damp(tw.em.on, 0, 1.5 + tw.idx * .15, dt); }
-    if (t > 4.4) { G.level = 0; G.press = Math.max(.8, G.press * .85); G.run++; setPhase('crumble'); }
+    if (G.autoAdvanceSummary && t > 5.0) { G.level = 0; G.press = Math.max(.8, G.press * .85); G.run++; setPhase('crumble'); }
   } else if (G.phase === 'crumble') {
     let done = true;
     for (const p of B.pieces) {

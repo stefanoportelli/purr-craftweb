@@ -97,7 +97,7 @@ function step(rdt) {
       }
     }
   }
-  const spray = B.bio.spray;
+  const spray = R.perf ? null : B.bio.spray;
   if (live && B.fallAt && spray === 'lava') {
     const f = B.fallAt, ax = Math.abs(f.oz), az = Math.abs(f.ox);
     if (rnd() < dt * 9) { const tau = rr(.1, 1.1), o = f.ext + f.v0 * tau, sd = rr(-.8, .8) * f.w; fxPart(f.x + f.ox * o + ax * sd, f.y - 4.5 * tau * tau, f.z + f.oz * o + az * sd, f.ox * rr(.2, 1.2) + rr(-.4, .4), rr(.2, 1.6), f.oz * rr(.2, 1.2) + rr(-.4, .4), rr(.6, 1.3), rr(.045, .075), rr(1.8, 3), rr(.6, 1.1), .12, { grav: 2.5, drag: .4, wob: 1 }); }
@@ -177,7 +177,7 @@ function frame(now) {
     R.fpsText = (1000 / ms).toFixed(0) + ' fps  ' + R.iw + 'x' + R.ih + '  calls ' + R.renderer.info.render.calls + '  mons ' + G.mons.length;
     if (ms > 22.5) { _slow++; _fast = 0; } else { _slow = 0; _fast = ms < 18.6 ? _fast + 1 : 0; }
     _hold -= _acc;
-    if (!HASH.noscale) {
+    if (!HASH.noscale && !R.perf) {
       if (_slow >= 3 && R.quality <= .55 && !R.lite) { R.lite = 1; _slow = 0; LT.moon.shadow.mapSize.set(1024, 1024); if (LT.moon.shadow.map) { LT.moon.shadow.map.dispose(); LT.moon.shadow.map = null; } }
       if (_slow >= 2 && R.quality > .55) { R.quality = Math.max(.55, R.quality - .15); resizeRenderer(); _slow = 0; _hold = _back; _back = Math.min(480, _back * 2); }
       else if (_fast >= 3 && R.quality < 1 && _hold <= 0) { R.quality = Math.min(1, R.quality + .15); resizeRenderer(); _fast = 0; }
@@ -189,7 +189,11 @@ function frame(now) {
 function boot() {
   if (window.matchMedia && matchMedia('(pointer: coarse)').matches && !HASH.noscale) R.quality = .85;
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) FX.shakeK = .25;
-  initRenderer(); initMaterials(); resizeRenderer(); initLights(); initFX(); initWeather(); initKits(); UI.init();
+  let wantPerf = !!HASH.lite;
+  try { if (localStorage.getItem('purrcraft.perf') === '1') wantPerf = true; } catch (e) {}
+  initRenderer(); initMaterials(); initLights();
+  if (wantPerf && typeof setPerfMode === 'function') setPerfMode(true, true); else resizeRenderer();
+  initFX(); initWeather(); initKits(); UI.init();
   KIT.marker = new PartBatch(S => {
     const gold = mulC(COL.gold, .85), amber = C(0xc9682a);
     S.box(.08, 1.15, .08, 0, .57, 0, COL.woodD, { l: L_WOOD, r: [0, 0, .05] }); S.cone(.07, .14, .03, 1.2, 0, COL.brass, { n: 4, l: L_METAL, emis: .05 });
@@ -216,6 +220,7 @@ function boot() {
   if (HASH.ff) { const n = Math.round(+HASH.ff * 30); for (let i = 0; i < n; i++) step(1 / 30); CAM.sx = CAM.fx; CAM.sz = CAM.fz; R.fade = 1; }
   if (HASH.phase) setPhase(HASH.phase);
   if (HASH.cam) { const c = HASH.cam.split(',').map(Number); window.__cw.lock = c; }
+  try { G.starsByLevel = JSON.parse(localStorage.getItem('purrcraft.stars') || '{}'); } catch (e) { G.starsByLevel = {}; }
   const ld = document.getElementById('load'); if (ld) ld.remove();
   if (HASH.manual) return;
   _last = performance.now();
