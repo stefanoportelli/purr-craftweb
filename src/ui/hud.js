@@ -902,32 +902,39 @@ const UI = (() => {
       U.soundRect = sq('sound', xl, wide ? wl : zb, soundTap, AU.ready ? (AU.muted ? 'Sound is off (M)' : 'Sound is on (M)') : 'Sound', (x, y) => { if (wide) { PX.icon(c, icn, x + pad, y + Math.round((zb - ih2 * s) / 2), s, .85); text(lbl, x + pad + iw2 * s + 3 * s, y + Math.round((zb - LH) / 2) + s, COLR.tx); } else PX.icon(c, icn, x + Math.round((zb - iw2 * k) / 2), y + Math.round((zb - ih2 * k) / 2), k, AU.ready ? 1 : .8); }, !AU.ready);
       xl += (wide ? wl : zb) + g3; }
     sq('perf', xl, zb, togglePerf, R.perf ? 'Grafica Lite: ON (L)' : 'Grafica HD · clicca per Lite (L)', label(R.perf ? 'LT' : 'HD', R.perf ? COLR.cold : COLR.tx), R.perf); xl += zb + g3;
-    if (typeof CHARGE !== 'undefined' && G.phase === 'play') {
-      const ch = CHARGE, C = ch.cfg();
-      const chLbl = ch.state === 'ready' ? 'LASER' : (ch.state === 'armed' ? 'PUNTA!' : (ch.state === 'active' ? ch.timer.toFixed(1) + 's' : Math.ceil(ch.cd) + 's'));
-      const [liw, lih] = PX.iconSize('laser');
-      const chW = Math.max(zb + 12 * s, liw * s + 5 * s + tw('PUNTA!') + pad * 2);
-      const chTip = ch.state === 'ready' ? 'Carica Felina (Q) · Segui il puntino' : (ch.state === 'armed' ? 'Clicca sulla strada per lanciare!' : (ch.state === 'active' ? 'Muovi cursore/dito per guidare i gatti!' : 'Carica Felina in ricarica'));
-      sq('charge', xl, chW, toggleCharge, chTip, (x, y) => {
-        if (ch.state === 'cooling' && C.cooldown > 0) {
-          const fracC = sat(1 - ch.cd / C.cooldown);
-          c.fillStyle = 'rgba(255,46,85,0.22)';
-          c.fillRect(x + 2 * s, y + 2 * s, Math.round((chW - 4 * s) * fracC), zb - 4 * s);
-        } else if (ch.state === 'armed' || ch.state === 'active') {
-          c.fillStyle = 'rgba(255,46,85,0.28)';
-          c.fillRect(x + 2 * s, y + 2 * s, chW - 4 * s, zb - 4 * s);
-        }
-        PX.icon(c, 'laser', x + pad - s, y + Math.round((zb - lih * s) / 2), s, ch.state === 'cooling' ? 0.4 : 1);
-        const colT = ch.state === 'armed' ? '#ffffff' : (ch.state === 'active' ? '#ff8a9e' : (ch.state === 'ready' ? '#ffd6de' : COLR.dim));
-        text(chLbl, x + pad + liw * s + 2 * s, y + Math.round((zb - LH) / 2) + s, colT);
-      }, ch.state === 'armed' || ch.state === 'active');
-      xl += chW + g3;
-    }
     let xr = Wr - 5 * s - zb; const cur = camZoomNow();
     if (nR === 3) { sq('full', xr, zb, toggleFull, 'Full screen', corners, false); xr -= zb + g3; }
     sq('zin', xr, zb, () => camZoomBy(1.5), 'Zoom in (+)', glyph('+', cur < 2.99 ? COLR.tx : '#5a5448'), false); xr -= zb + g3;
     sq('zout', xr, zb, () => camZoomBy(1 / 1.5), 'Zoom out (-)', glyph('-', cur > camZoomMin() + .01 ? COLR.tx : '#5a5448'), false);
     let yUp = yB - g3;
+    if (typeof CHARGE !== 'undefined' && G.phase === 'play') {
+      const ch = CHARGE, C = ch.cfg();
+      const chLbl = ch.state === 'ready' ? 'LASER' : (ch.state === 'armed' ? 'PUNTA!' : (ch.state === 'active' ? ch.timer.toFixed(1) + 's' : Math.ceil(ch.cd) + 's'));
+      const [liw, lih] = PX.iconSize('laser');
+      const chW = Math.max(zb + 12 * s, liw * s + 5 * s + tw('PUNTA!') + pad * 2);
+      const chTip = ch.state === 'ready' ? 'Carica Felina (Q) · Segui il puntino' : (ch.state === 'armed' ? 'Tocca la strada per lanciare!' : (ch.state === 'active' ? 'Muovi cursore/dito per guidare i gatti!' : 'Carica Felina in ricarica'));
+      const fitsInline = (xl + chW <= xr - g3);
+      const cxB = fitsInline ? xl : (5 * s + iL);
+      const cyB = fitsInline ? yB : (yB - g3 - zb);
+      const hotCh = over(cxB, cyB, chW, zb), downCh = U.press === 'charge', dyCh = downCh ? s : 0;
+      const onCh = ch.state === 'armed' || ch.state === 'active';
+      U.hud.push({ id: 'charge', x: cxB, y: cyB, w: chW, h: zb, fn: toggleCharge, hud: true });
+      if (hotCh) { U.hudHot = true; tipB = { x: cxB + chW / 2, tip: chTip }; }
+      plate(cxB, cyB + dyCh, chW, zb, hotCh || downCh ? { bd: COLR.bdHi, bg: COLR.bg2 } : onCh ? { bd: '#ff2e55', bg: 'rgba(42,10,20,0.92)' } : { bd: ch.state === 'ready' ? '#c93855' : COLR.bd });
+      if (ch.state === 'cooling' && C.cooldown > 0) {
+        const fracC = sat(1 - ch.cd / C.cooldown);
+        c.fillStyle = 'rgba(255,46,85,0.22)';
+        c.fillRect(cxB + 2 * s, cyB + dyCh + 2 * s, Math.round((chW - 4 * s) * fracC), zb - 4 * s);
+      } else if (onCh) {
+        c.fillStyle = 'rgba(255,46,85,0.28)';
+        c.fillRect(cxB + 2 * s, cyB + dyCh + 2 * s, chW - 4 * s, zb - 4 * s);
+      }
+      PX.icon(c, 'laser', cxB + pad - s, cyB + dyCh + Math.round((zb - lih * s) / 2), s, ch.state === 'cooling' ? 0.4 : 1);
+      const colT = ch.state === 'armed' ? '#ffffff' : (ch.state === 'active' ? '#ff8a9e' : (ch.state === 'ready' ? '#ffd6de' : COLR.dim));
+      text(chLbl, cxB + pad + liw * s + 2 * s, cyB + dyCh + Math.round((zb - LH) / 2) + s, colT);
+      if (fitsInline) xl += chW + g3;
+      else yUp = Math.min(yUp, cyB - g3);
+    }
     if (CAM.man && play) {
       const lbl = 'Follow the fight', w = tw(lbl) + pad * 2, fits = xr - g3 - w >= xl, xf2 = fits ? xr - g3 - w : Wr - w - 5 * s, yf = fits ? yB + Math.round((zb - hB) / 2) : yB - g3 - hB, hotF = over(xf2, yf, w, hB);
       plate(xf2, yf, w, hB, hotF ? { bd: COLR.bdHi, bg: COLR.bg2 } : { bd: '#8a6a3a' }); text(lbl, xf2 + pad, yf + pad - s, COLR.tx);
