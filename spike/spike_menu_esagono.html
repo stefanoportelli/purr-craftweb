@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purr-craft — Spike v3: Rifinitura Menu Esagono Compatto</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    body { background: #090d16; color: #e6edf3; overflow: hidden; user-select: none; height: 100vh; display: flex; flex-direction: column; }
+
+    #topbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      padding: 9px 14px; background: rgba(12, 17, 28, 0.96);
+      border-bottom: 1px solid #24344d; z-index: 20;
+    }
+    .brand { font-weight: 800; font-size: 13px; color: #fbbf24; margin-right: 4px; }
+    .grp { display: flex; align-items: center; gap: 3px; background: #0f1726; border: 1px solid #22324a; border-radius: 8px; padding: 3px; }
+    .grp-lbl { font-size: 10px; color: #7c93b2; font-weight: 700; text-transform: uppercase; padding: 0 6px; letter-spacing: 0.4px; }
+    button.pill {
+      background: transparent; color: #cbd5e1; border: 1px solid transparent;
+      border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all 0.12s;
+    }
+    button.pill:hover { background: #1c2a40; color: #fff; }
+    button.pill.active { background: #2c2112; border-color: #f59e0b; color: #fde68a; }
+    button.pill.blue.active { background: #102a42; border-color: #38bdf8; color: #bae6fd; }
+    button.pill.green.active { background: #133123; border-color: #22c55e; color: #bbf7d0; }
+    .sl-box { display: flex; align-items: center; gap: 6px; padding: 0 6px; font-size: 11px; color: #94a3b8; }
+    .sl-box b { color: #fde68a; min-width: 30px; }
+    .sl-box input { width: 78px; accent-color: #f59e0b; cursor: pointer; }
+
+    #stage-wrap { position: relative; flex: 1; overflow: hidden; }
+    canvas#bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    canvas#ui { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+
+    #desc-bar {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+      max-width: 780px; width: calc(100% - 28px);
+      background: rgba(11, 16, 26, 0.93); border: 1px solid #2b3f5e; border-radius: 10px;
+      padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55); z-index: 15;
+    }
+    #desc-title { font-size: 13px; font-weight: 800; color: #fbbf24; margin-bottom: 2px; }
+    #desc-txt { font-size: 11.5px; color: #94a3b8; line-height: 1.38; }
+    .dna-badge {
+      flex-shrink: 0; text-align: right; font-size: 12px; color: #fde68a; font-weight: 700;
+      background: #172030; border: 1px solid #334868; border-radius: 8px; padding: 6px 10px;
+    }
+    .dna-badge small { display: block; font-size: 10px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
+
+    #toast {
+      position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #fef3c7;
+      padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      opacity: 0; pointer-events: none; transition: opacity 0.18s; z-index: 30;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <span class="brand">⬡ Esagono Compatto</span>
+
+    <div class="grp" id="varGrp">
+      <span class="grp-lbl">Variante</span>
+      <button class="pill active" data-var="0">A · Alveare Stretto</button>
+      <button class="pill" data-var="1">B · Corona + Pip Integrati</button>
+      <button class="pill" data-var="2">C · Nido d'Ape Laterale</button>
+      <button class="pill" data-var="3">D · Circuito Lab + Slot Preview</button>
+      <button class="pill" data-var="4">E · Pixel-Crisp Purr-craft</button>
+    </div>
+
+    <div class="grp" id="presetGrp">
+      <span class="grp-lbl">Stato</span>
+      <button class="pill green" data-preset="empty">Libera</button>
+      <button class="pill green" data-preset="base">Base (0/4)</button>
+      <button class="pill green" data-preset="one">1 Elem (F)</button>
+      <button class="pill green active" data-preset="two">2 Elem (F+L · Lock)</button>
+      <button class="pill green" data-preset="max">Max (4/4)</button>
+    </div>
+
+    <div class="grp" id="rosterGrp">
+      <span class="grp-lbl">Fiale</span>
+      <button class="pill blue active" data-roster="4">4 Elem</button>
+      <button class="pill blue" data-roster="2">Solo Lv1 (2)</button>
+    </div>
+
+    <div class="grp">
+      <div class="sl-box">
+        <span>Raggio</span>
+        <input id="slDist" type="range" min="62" max="92" step="2" value="74" />
+        <b id="vDist">74</b>
+      </div>
+      <button class="pill" id="btnDnaToggle">DNA: 180</button>
+    </div>
+  </div>
+
+  <div id="stage-wrap">
+    <canvas id="bg"></canvas>
+    <canvas id="ui"></canvas>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="desc-bar">
+    <div>
+      <div id="desc-title">A · Alveare Stretto</div>
+      <div id="desc-txt">Esagoni DNA ravvicinati ad anello compatto intorno al gatto, con 4 mini-esagoni di stato subito sopra la testa e tasto Vendi agganciato in basso.</div>
+    </div>
+    <div class="dna-badge" id="dnaBox">
+      🧬 180 DNA
+      <small>1° tap seleziona · 2° tap conferma ✓</small>
+    </div>
+  </div>
+
+  <script>
+  'use strict';
+
+  const ALL_ELEMENTS = [
+    { id: 'fire',  name: 'Fuoco',  short: 'FUO', tag: 'TERRA', col: '#ff7832', icon: 'fire'  },
+    { id: 'elec',  name: 'Laser',  short: 'LAS', tag: 'ARIA',  col: '#38bdf8', icon: 'elec'  },
+    { id: 'water', name: 'Gelo',   short: 'GEL', tag: 'TERRA', col: '#60a5fa', icon: 'water' },
+    { id: 'bio',   name: 'Bio',    short: 'BIO', tag: 'MISTO', col: '#4ade80', icon: 'bio'   },
+  ];
+  const DNA_COSTS = [50, 30, 50, 80, 120];
+
+  const VARIANTS = [
+    {
+      name: 'A · Alveare Stretto',
+      desc: 'Esagoni ravvicinati in corona stretta attorno al gatto, con 4 mini-esagoni DNA subito sopra la testa e pillola compatta in cima.'
+    },
+    {
+      name: 'B · Corona + Pip Integrati nella Pillola',
+      desc: 'I 4 slot DNA sono integrati direttamente dentro la pillola compatta superiore: lascia l\'intera area attorno al gatto ancora più libera e pulita.'
+    },
+    {
+      name: 'C · Nido d\'Ape Laterale (2 Sx + 2 Dx)',
+      desc: 'Coppie di esagoni incastrati a nido d\'ape ai lati destro e sinistro (zero ingombro verticale), Vendi centrato sotto, visuale del gatto sempre pulita.'
+    },
+    {
+      name: 'D · Circuito Lab + Anteprima Slot DNA',
+      desc: 'Piste luminose collegano gli esagoni al gatto; al 1° tap (conferma armata) la pista si accende e lo slot DNA successivo pulsa con il colore dell\'elemento scelto!'
+    },
+    {
+      name: 'E · Pixel-Crisp Purr-craft',
+      desc: 'Esagoni dal contorno scuro netto e doppia cornice dorata/elementale in linea con l\'HUD pixel-art del gioco, con costo incassato nel vertice inferiore.'
+    },
+  ];
+
+  const S = {
+    variant: 0,
+    rosterSize: 4, // 4 o 2 (solo Fuoco+Laser)
+    dist: 74,      // Raggio compatto di default (era 96 nello spike precedente!)
+    dnaGold: 180,
+    hasTower: true,
+    dna: ['fire', 'elec'],
+    armedId: null,
+    hoverId: null,
+    t: 0,
+    openAnim: 1,
+    cx: 0, cy: 0,
+    btns: [],
+  };
+
+  function activeElements() {
+    return S.rosterSize === 2 ? ALL_ELEMENTS.slice(0, 2) : ALL_ELEMENTS;
+  }
+
+  function distinctElems(dna) {
+    const out = [];
+    for (const e of dna) if (!out.includes(e)) out.push(e);
+    return out;
+  }
+
+  function canAddElement(dna, elemId) {
+    if (dna.length >= 4) return { ok: false, reason: 'max' };
+    const dist = distinctElems(dna);
+    if (dist.length >= 2 && !dist.includes(elemId)) return { ok: false, reason: 'locked2' };
+    return { ok: true, reason: null };
+  }
+
+  function catProfile(dna) {
+    const n = dna.length;
+    if (n === 0) return { name: 'Gatto Base', tag: 'TERRA', dmg: 10, range: 4.4, col: '#e8b04a' };
+    const counts = {};
+    for (const e of dna) counts[e] = (counts[e] || 0) + 1;
+    const keys = Object.keys(counts);
+    if (keys.length === 2 && n === 4) {
+      if (counts.fire === 2 && counts.elec === 2) return { name: 'Gatto Plasma', tag: 'ARIA', dmg: 480, range: 8.5, col: '#e879f9' };
+      if (counts.fire === 3 && counts.elec === 1) return { name: 'Magma Volt', tag: 'TERRA', dmg: 135, range: 6.6, col: '#fb923c' };
+      if (counts.elec === 3 && counts.fire === 1) return { name: 'Cyborg Piro', tag: 'ARIA', dmg: 175, range: 7.5, col: '#38bdf8' };
+      return { name: 'Ibrido ' + keys.map(k => ALL_ELEMENTS.find(x => x.id === k).short).join('+'), tag: 'MISTO', dmg: 190, range: 7.0, col: '#a78bfa' };
+    }
+    const dom = keys.sort((a, b) => counts[b] - counts[a])[0];
+    const el = ALL_ELEMENTS.find(x => x.id === dom);
+    const rngs = [4.4, 5.2, 5.9, 6.6, 7.6];
+    const maxNames = { fire: 'Gatto Vulcano', elec: 'Gatto Cyborg', water: 'Gatto Glaciale', bio: 'Gatto Tossico' };
+    const nm = n === 4 ? maxNames[dom] : ('Gatto ' + el.name + ' Lv ' + n + (keys.length > 1 ? '*' : ''));
+    return { name: nm, tag: el.tag, dmg: [10, 28, 60, 115, 200][n], range: rngs[n], col: el.col };
+  }
+
+  function spentDNA() {
+    if (!S.hasTower) return 0;
+    let tot = DNA_COSTS[0];
+    for (let i = 1; i <= S.dna.length; i++) tot += DNA_COSTS[i];
+    return tot;
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1700);
+  }
+
+  function syncHUDInfo() {
+    document.getElementById('desc-title').textContent = VARIANTS[S.variant].name;
+    document.getElementById('desc-txt').textContent = VARIANTS[S.variant].desc;
+    const dist = distinctElems(S.dna);
+    const note = S.armedId
+      ? '✓ Riclicca l\'esagono per confermare!'
+      : (dist.length >= 2 && S.dna.length < 4
+        ? 'Max 2 elem (' + dist.map(id => ALL_ELEMENTS.find(e => e.id === id).short).join('+') + ') · altri bloccati'
+        : (S.hasTower ? ('Slot DNA: ' + S.dna.length + '/4 · 2-tap') : 'Piazzola libera · 2-tap'));
+    document.getElementById('dnaBox').innerHTML = `🧬 ${S.dnaGold} DNA<small>${note}</small>`;
+    document.getElementById('btnDnaToggle').textContent = 'DNA: ' + S.dnaGold;
+  }
+
+  // --- CANVAS ---
+  const bgCv = document.getElementById('bg');
+  const uiCv = document.getElementById('ui');
+  const bgCtx = bgCv.getContext('2d');
+  const ctx = uiCv.getContext('2d');
+  let W = 1, H = 1, DPR = 1;
+
+  function resize() {
+    const r = document.getElementById('stage-wrap').getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    bgCv.width = uiCv.width = Math.round(W * DPR);
+    bgCv.height = uiCv.height = Math.round(H * DPR);
+    S.cx = W * 0.5;
+    S.cy = H * 0.48;
+    drawBackdrop();
+  }
+
+  function drawBackdrop() {
+    const c = bgCtx;
+    c.save(); c.scale(DPR, DPR);
+    const grad = c.createRadialGradient(S.cx, S.cy, 36, S.cx, S.cy, Math.max(W, H) * 0.72);
+    grad.addColorStop(0, '#1c2a33'); grad.addColorStop(0.55, '#111a24'); grad.addColorStop(1, '#070b12');
+    c.fillStyle = grad; c.fillRect(0, 0, W, H);
+
+    c.strokeStyle = 'rgba(120, 160, 190, 0.08)'; c.lineWidth = 1;
+    for (let x = -H; x < W + H; x += 44) {
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x + H * 1.4, H); c.stroke();
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x - H * 1.4, H); c.stroke();
+    }
+
+    c.save();
+    c.strokeStyle = '#33414d'; c.lineWidth = 56; c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(W * 0.05, H * 0.78);
+    c.quadraticCurveTo(S.cx - 80, S.cy + 145, S.cx + 170, S.cy + 90);
+    c.quadraticCurveTo(W * 0.85, S.cy + 40, W * 0.96, H * 0.22);
+    c.stroke();
+    c.strokeStyle = '#475569'; c.lineWidth = 44; c.stroke();
+    c.restore();
+
+    const armedElem = (S.armedId && S.armedId.startsWith('el_')) ? S.armedId.slice(3) : null;
+    if (S.hasTower || S.armedId === 'build') {
+      const baseDna = S.hasTower ? S.dna : [];
+      const pr = armedElem ? catProfile(baseDna.concat([armedElem])) : catProfile(baseDna);
+      const radPx = 150 + (pr.range - 4.4) * 28;
+      c.save();
+      c.translate(S.cx, S.cy + 8); c.scale(1, 0.56);
+      c.beginPath(); c.arc(0, 0, radPx, 0, Math.PI * 2);
+      c.strokeStyle = S.armedId ? pr.col + 'cc' : pr.col + '55';
+      c.lineWidth = S.armedId ? 3 : 2.2;
+      if (armedElem || S.armedId === 'build') c.setLineDash([8, 6]);
+      c.stroke(); c.setLineDash([]);
+      c.fillStyle = pr.col + (S.armedId ? '18' : '0c'); c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+
+  function hexPath(c, x, y, rad, flatTop = false) {
+    c.beginPath();
+    const off = flatTop ? 0 : Math.PI / 6;
+    for (let i = 0; i < 6; i++) {
+      const a = off + (i * Math.PI) / 3;
+      const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.closePath();
+  }
+
+  function drawCenterPad(c) {
+    const x = S.cx, y = S.cy;
+    c.save();
+    c.save();
+    c.translate(x, y + 10); c.scale(1, 0.58);
+    c.beginPath(); c.arc(0, 0, 40, 0, Math.PI * 2);
+    c.fillStyle = '#1f2937'; c.fill();
+    c.lineWidth = 3; c.strokeStyle = S.hasTower ? '#64748b' : '#eab308'; c.stroke();
+    c.beginPath(); c.arc(0, -4, 30, 0, Math.PI * 2);
+    c.fillStyle = '#334155'; c.fill();
+    c.lineWidth = 2; c.strokeStyle = '#94a3b8'; c.stroke();
+    c.restore();
+
+    if (!S.hasTower) {
+      c.strokeStyle = '#a16207'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(x, y + 8); c.lineTo(x, y - 20); c.stroke();
+      c.fillStyle = '#f59e0b';
+      c.beginPath(); c.moveTo(x, y - 20); c.lineTo(x + 17, y - 13); c.lineTo(x, y - 6); c.closePath(); c.fill();
+    } else {
+      const pr = catProfile(S.dna);
+      const sc = 0.84 + S.dna.length * 0.075;
+      const bob = Math.sin(S.t * 3.5) * 1.8;
+      c.save();
+      c.translate(x, y + bob); c.scale(sc, sc);
+      c.fillStyle = pr.col;
+      roundRect(c, -15, -14, 30, 22, 7); c.fill();
+      c.strokeStyle = '#0b0d14'; c.lineWidth = 2; c.stroke();
+      c.beginPath();
+      c.moveTo(-13, -12); c.lineTo(-16, -25); c.lineTo(-4, -15);
+      c.moveTo(13, -12);  c.lineTo(16, -25);  c.lineTo(4, -15);
+      c.fillStyle = pr.col; c.fill(); c.stroke();
+      c.fillStyle = '#0b0d14';
+      c.fillRect(-7, -7, 4, 5); c.fillRect(3, -7, 4, 5);
+      if (S.dna.includes('elec')) {
+        c.strokeStyle = '#38bdf8'; c.lineWidth = 2;
+        c.beginPath(); c.arc(5, -5, 6, 0, Math.PI * 2); c.stroke();
+      }
+      c.restore();
+    }
+    c.restore();
+  }
+
+  function drawIcon(c, type, x, y, sz, dim) {
+    c.save(); c.translate(x, y);
+    if (dim) c.globalAlpha *= 0.32;
+    if (type === 'cat') {
+      c.fillStyle = '#f59e0b';
+      roundRect(c, -sz * 0.45, -sz * 0.25, sz * 0.9, sz * 0.65, 5); c.fill();
+      c.beginPath();
+      c.moveTo(-sz * 0.4, -sz * 0.2); c.lineTo(-sz * 0.46, -sz * 0.56); c.lineTo(-sz * 0.12, -sz * 0.25);
+      c.moveTo(sz * 0.4, -sz * 0.2);  c.lineTo(sz * 0.46, -sz * 0.56);  c.lineTo(sz * 0.12, -sz * 0.25);
+      c.fill();
+      c.fillStyle = '#0b0d14';
+      c.fillRect(-sz * 0.22, -sz * 0.04, sz * 0.13, sz * 0.16);
+      c.fillRect(sz * 0.09, -sz * 0.04, sz * 0.13, sz * 0.16);
+    } else if (type === 'fire') {
+      c.fillStyle = '#ff7832';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.56);
+      c.bezierCurveTo(sz * 0.48, -sz * 0.12, sz * 0.45, sz * 0.48, 0, sz * 0.52);
+      c.bezierCurveTo(-sz * 0.45, sz * 0.48, -sz * 0.48, -sz * 0.12, 0, -sz * 0.56);
+      c.fill();
+      c.fillStyle = '#fde047';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.14);
+      c.bezierCurveTo(sz * 0.22, sz * 0.08, sz * 0.18, sz * 0.38, 0, sz * 0.40);
+      c.bezierCurveTo(-sz * 0.18, sz * 0.38, -sz * 0.22, sz * 0.08, 0, -sz * 0.14);
+      c.fill();
+    } else if (type === 'elec') {
+      c.fillStyle = '#38bdf8';
+      c.beginPath();
+      c.moveTo(sz * 0.12, -sz * 0.56); c.lineTo(-sz * 0.36, sz * 0.06); c.lineTo(0, sz * 0.06);
+      c.lineTo(-sz * 0.14, sz * 0.56); c.lineTo(sz * 0.36, -sz * 0.08); c.lineTo(0, -sz * 0.08);
+      c.closePath(); c.fill();
+      c.fillStyle = '#e0f2fe';
+      c.beginPath(); c.arc(0, 0, sz * 0.12, 0, Math.PI * 2); c.fill();
+    } else if (type === 'water') {
+      c.fillStyle = '#60a5fa';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.55);
+      c.bezierCurveTo(sz * 0.44, -sz * 0.02, sz * 0.42, sz * 0.48, 0, sz * 0.50);
+      c.bezierCurveTo(-sz * 0.42, sz * 0.48, -sz * 0.44, -sz * 0.02, 0, -sz * 0.55);
+      c.fill();
+      c.fillStyle = '#dbeafe';
+      c.beginPath(); c.arc(-sz * 0.12, sz * 0.12, sz * 0.10, 0, Math.PI * 2); c.fill();
+    } else if (type === 'bio') {
+      c.fillStyle = '#4ade80';
+      for (let i = 0; i < 3; i++) {
+        const a = -Math.PI / 2 + i * (Math.PI * 2 / 3);
+        c.beginPath(); c.arc(Math.cos(a) * sz * 0.22, Math.sin(a) * sz * 0.22, sz * 0.22, 0, Math.PI * 2); c.fill();
+      }
+      c.fillStyle = '#052e16';
+      c.beginPath(); c.arc(0, 0, sz * 0.15, 0, Math.PI * 2); c.fill();
+    } else if (type === 'sell') {
+      c.fillStyle = '#fbbf24';
+      c.beginPath(); c.arc(0, -sz * 0.08, sz * 0.36, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#92400e'; c.lineWidth = 2; c.stroke();
+      c.fillStyle = '#92400e';
+      c.font = `800 ${Math.round(sz * 0.45)}px system-ui`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('+', 0, -sz * 0.06);
+      c.fillStyle = '#ef4444';
+      c.beginPath();
+      c.moveTo(-sz * 0.22, sz * 0.30); c.lineTo(sz * 0.22, sz * 0.30); c.lineTo(0, sz * 0.54); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  function drawLockOverlay(c, x, y, sz) {
+    c.save(); c.translate(x, y);
+    c.strokeStyle = '#94a3b8'; c.lineWidth = 2;
+    c.beginPath(); c.arc(0, -sz * 0.14, sz * 0.18, Math.PI, 0); c.stroke();
+    c.fillStyle = '#334155';
+    roundRect(c, -sz * 0.26, -sz * 0.12, sz * 0.52, sz * 0.42, 3); c.fill();
+    c.strokeStyle = '#cbd5e1'; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = '#fbbf24';
+    c.beginPath(); c.arc(0, sz * 0.08, sz * 0.06, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+
+  function drawConfirmOverlay(c, x, y, sz, isSell) {
+    const pulse = 1 + Math.sin(S.t * 10) * 0.08;
+    c.save(); c.translate(x, y); c.scale(pulse, pulse);
+    c.beginPath(); c.arc(0, 0, sz * 0.47, 0, Math.PI * 2);
+    c.fillStyle = isSell ? 'rgba(220, 38, 38, 0.86)' : 'rgba(22, 163, 74, 0.88)';
+    c.fill();
+    c.lineWidth = 2; c.strokeStyle = isSell ? '#fecaca' : '#bbf7d0'; c.stroke();
+    c.strokeStyle = '#ffffff'; c.lineWidth = Math.max(2.4, sz * 0.13);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(-sz * 0.22, sz * 0.02);
+    c.lineTo(-sz * 0.05, sz * 0.19);
+    c.lineTo(sz * 0.24, -sz * 0.17);
+    c.stroke();
+    c.restore();
+  }
+
+  function buildActions() {
+    if (!S.hasTower) {
+      const can = S.dnaGold >= DNA_COSTS[0];
+      return [{
+        id: 'build', kind: 'build', icon: 'cat', label: 'Gatto Base',
+        cost: DNA_COSTS[0], col: '#f59e0b', enabled: can, locked: false, armed: S.armedId === 'build',
+        reason: can ? null : 'dna'
+      }];
+    }
+    const acts = [];
+    const nextCost = S.dna.length < 4 ? DNA_COSTS[S.dna.length + 1] : 0;
+    for (const el of activeElements()) {
+      const chk = canAddElement(S.dna, el.id);
+      const afford = S.dnaGold >= nextCost;
+      const locked = !chk.ok;
+      const id = 'el_' + el.id;
+      acts.push({
+        id, elemId: el.id, kind: 'elem', icon: el.icon,
+        label: el.name, cost: nextCost, col: el.col,
+        enabled: chk.ok && afford, locked, armed: S.armedId === id,
+        reason: locked ? chk.reason : (afford ? null : 'dna'),
+        nextProf: chk.ok ? catProfile(S.dna.concat([el.id])) : null
+      });
+    }
+    const ref = Math.floor(spentDNA() * 0.5);
+    acts.push({
+      id: 'sell', kind: 'sell', icon: 'sell', label: 'Vendi',
+      cost: '+' + ref, col: S.armedId === 'sell' ? '#ef4444' : '#fbbf24',
+      enabled: true, locked: false, armed: S.armedId === 'sell', reason: null
+    });
+    return acts;
+  }
+
+  // Mini-esagoni di stato DNA (con eventuale preview pulsante dello slot successivo!)
+  function drawHexPips(c, cx, cy, gap = 14, rad = 6, previewCol = null) {
+    if (!S.hasTower) return;
+    const x0 = cx - (3 * gap) / 2;
+    for (let i = 0; i < 4; i++) {
+      const px = x0 + i * gap;
+      const id = S.dna[i];
+      const el = id ? ALL_ELEMENTS.find(e => e.id === id) : null;
+      const isNextPreview = !el && previewCol && i === S.dna.length;
+      c.save();
+      if (isNextPreview) {
+        const p = 1 + Math.sin(S.t * 10) * 0.16;
+        c.translate(px, cy); c.scale(p, p); c.translate(-px, -cy);
+      }
+      hexPath(c, px, cy, rad);
+      c.fillStyle = el ? el.col : (isNextPreview ? previewCol + 'aa' : '#152033');
+      c.fill();
+      c.lineWidth = el || isNextPreview ? 1.6 : 1.2;
+      c.strokeStyle = el ? '#ffffff' : (isNextPreview ? '#ffffff' : '#475569');
+      c.stroke();
+      c.restore();
+    }
+  }
+
+  // Pillola testo COMPATTA (fissa come scelta dell'utente!)
+  function drawCompactPill(c, cx, topY, inlinePips = false, previewCol = null) {
+    const armedBtn = S.btns.find(b => b.id === S.armedId);
+    const hovBtn = S.btns.find(b => b.id === S.hoverId);
+    const focus = armedBtn ? armedBtn.act : (hovBtn ? hovBtn.act : null);
+
+    let title = S.hasTower ? (catProfile(S.dna).name + ' · ' + catProfile(S.dna).tag) : 'Piazzola Libera';
+    let col = S.hasTower ? catProfile(S.dna).col : '#fbbf24';
+
+    if (focus) {
+      if (focus.kind === 'build') {
+        title = focus.armed ? '✓ Conferma Gatto Base (' + focus.cost + ')' : ('Gatto Base · ' + focus.cost);
+        col = focus.armed ? '#4ade80' : '#fbbf24';
+      } else if (focus.kind === 'elem') {
+        if (focus.locked) {
+          title = focus.reason === 'max' ? 'DNA 4/4 (Max)' : (focus.label + ' Bloccato (max 2 elem)');
+          col = '#94a3b8';
+        } else if (focus.nextProf) {
+          title = (focus.armed ? '✓ ' : '→ ') + focus.nextProf.name + ' [' + focus.nextProf.tag + ']';
+          col = focus.armed ? '#4ade80' : focus.col;
+        }
+      } else if (focus.kind === 'sell') {
+        title = focus.armed ? ('✓ Conferma Vendi (' + focus.cost + ')') : ('Vendi ' + focus.cost + ' DNA');
+        col = focus.armed ? '#f87171' : '#fbbf24';
+      }
+    }
+
+    c.font = '700 12px system-ui';
+    const tw = c.measureText(title).width;
+    const pipW = (inlinePips && S.hasTower) ? 58 : 0;
+    const pw = tw + 22 + pipW, ph = 26;
+    const px = cx - pw / 2, py = topY - ph - 8;
+
+    c.fillStyle = 'rgba(10, 14, 24, 0.94)';
+    roundRect(c, px, py, pw, ph, 13); c.fill();
+    c.strokeStyle = col + 'bb'; c.lineWidth = 1.6; c.stroke();
+
+    c.fillStyle = col; c.textBaseline = 'middle';
+    if (inlinePips && S.hasTower) {
+      c.textAlign = 'left';
+      c.fillText(title, px + 11, py + ph / 2);
+      drawHexPips(c, px + pw - 33, py + ph / 2, 13, 5, previewCol);
+    } else {
+      c.textAlign = 'center';
+      c.fillText(title, cx, py + ph / 2);
+    }
+  }
+
+  // Disegno singolo bottone esagonale (riutilizzato e stilizzato per le 5 varianti)
+  function drawHexNode(c, n, rad, opts = {}) {
+    const a = n.act;
+    const isSell = a.kind === 'sell';
+    const hov = S.hoverId === a.id;
+    S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: rad + 2 });
+
+    c.save();
+    c.translate(Math.round(n.x), Math.round(n.y));
+    if ((hov || a.armed) && !a.locked) c.scale(1.09, 1.09);
+
+    const bdCol = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : (hov ? '#fde047' : (a.reason === 'dna' ? '#ef4444' : a.col)));
+
+    // Varianti estetiche dell'esagono
+    if (opts.pixelCrisp) {
+      // Variante E: Doppio contorno scuro + highlight interno nitido stile Purr-craft
+      hexPath(c, 0, 0, rad + 2.5, opts.flatTop);
+      c.fillStyle = '#070a10'; c.fill();
+      hexPath(c, 0, 0, rad, opts.flatTop);
+      c.fillStyle = a.locked ? '#10151f' : (a.armed ? (isSell ? '#3d1419' : '#113022') : (hov ? '#212d40' : '#131b29'));
+      c.fill();
+      c.lineWidth = a.armed ? 2.8 : 2.2; c.strokeStyle = bdCol; c.stroke();
+      hexPath(c, 0, 0, rad - 3.5, opts.flatTop);
+      c.lineWidth = 1; c.strokeStyle = a.locked ? 'rgba(100,116,139,0.2)' : (bdCol + '44'); c.stroke();
+    } else {
+      if ((hov || a.armed) && !a.locked && opts.glow) {
+        c.shadowColor = a.armed ? (isSell ? '#ef4444' : '#4ade80') : a.col;
+        c.shadowBlur = 14;
+      }
+      hexPath(c, 0, 0, rad, opts.flatTop);
+      c.fillStyle = a.locked ? '#0f1520' : (a.armed ? (isSell ? '#3b151a' : '#132e22') : (hov ? '#1d2b42' : '#121c2c'));
+      c.fill();
+      c.lineWidth = (hov || a.armed) ? 2.8 : 2;
+      c.strokeStyle = bdCol; c.stroke();
+      c.shadowBlur = 0;
+    }
+
+    // Icona + Lock / Conferma ✓
+    drawIcon(c, a.icon, 0, -5, Math.round(rad * 0.84), a.locked || !a.enabled || a.armed);
+    if (a.locked) drawLockOverlay(c, 0, -5, Math.round(rad * 0.68));
+    else if (a.armed) drawConfirmOverlay(c, 0, -5, Math.round(rad * 0.84), isSell);
+
+    // Badge costo
+    const txt = a.locked ? (a.reason === 'max' ? 'MAX' : 'LOCK') : (a.armed ? '✓ ' + a.cost : String(a.cost));
+    if (opts.costPill) {
+      const pw = 40, ph = 15;
+      c.fillStyle = a.armed ? (isSell ? '#7f1d1d' : '#14532d') : '#090d16';
+      roundRect(c, -pw / 2, rad - 13, pw, ph, 5); c.fill();
+      c.lineWidth = 1.3; c.strokeStyle = bdCol; c.stroke();
+      c.font = '800 9.5px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+      c.fillText(txt, 0, rad - 5);
+    } else {
+      c.font = '800 10px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+      c.fillText(txt, 0, rad * 0.54);
+    }
+    c.restore();
+  }
+
+  // --- LAYOUT DELLE 5 VARIANTI DELL'ESAGONO COMPATTO ---
+  function drawMenu(c) {
+    S.btns = [];
+    const acts = buildActions();
+    const cx = S.cx, cy = S.cy;
+    const ease = 1 - Math.pow(1 - Math.min(1, S.openAnim), 3);
+    const R = S.dist;
+    const hexRad = 28; // Compatto e leggibile
+    const armedAct = acts.find(a => a.armed && a.kind === 'elem');
+    const previewCol = armedAct ? armedAct.col : null;
+
+    // Calcolo posizioni nodi in base alla variante e al numero di elementi (2 o 4)
+    let nodes = [];
+    let topEdgeY = cy - R - 28;
+
+    if (!S.hasTower) {
+      nodes = [{ act: acts[0], x: cx, y: cy - (R - 6) * ease }];
+      topEdgeY = cy - (R - 6) - 32;
+    } else {
+      const nEl = activeElements().length;
+      if (S.variant === 2) {
+        // C · Nido d'Ape Laterale (coppie verticali a incastro Sx e Dx!)
+        const dx = Math.max(54, R * 0.88);
+        const dy = 29;
+        if (nEl === 2) {
+          nodes = [
+            { act: acts[0], x: cx - dx * ease, y: cy - 8 * ease },
+            { act: acts[1], x: cx + dx * ease, y: cy - 8 * ease },
+            { act: acts[2], x: cx,             y: cy + (R * 0.86) * ease },
+          ];
+          topEdgeY = cy - 42;
+        } else {
+          nodes = [
+            { act: acts[0], x: cx - dx * ease, y: cy - dy * ease },
+            { act: acts[1], x: cx + dx * ease, y: cy - dy * ease },
+            { act: acts[2], x: cx - dx * ease, y: cy + dy * ease },
+            { act: acts[3], x: cx + dx * ease, y: cy + dy * ease },
+            { act: acts[4], x: cx,             y: cy + (R * 0.96) * ease },
+          ];
+          topEdgeY = cy - dy - 36;
+        }
+      } else {
+        // Corona ravvicinata: elementi ad arco stretto sopra/lati, Vendi in basso
+        if (nEl === 2) {
+          const angs = [-Math.PI * 0.78, -Math.PI * 0.22, Math.PI * 0.5];
+          nodes = acts.map((act, i) => ({ act, x: cx + Math.cos(angs[i]) * R * ease, y: cy + Math.sin(angs[i]) * R * ease }));
+        } else {
+          // 4 elementi ben vicini tra loro (arco superiore/laterale stretto) + Vendi a 90°
+          const angs = [-Math.PI * 0.82, -Math.PI * 0.61, -Math.PI * 0.39, -Math.PI * 0.18, Math.PI * 0.5];
+          const rElems = (S.variant === 0 || S.variant === 4) ? R * 1.05 : R * 1.08;
+          nodes = acts.map((act, i) => {
+            const rr = act.kind === 'sell' ? R * 0.92 : rElems;
+            return { act, x: cx + Math.cos(angs[i]) * rr * ease, y: cy + Math.sin(angs[i]) * rr * ease };
+          });
+          topEdgeY = cy - rElems - 32;
+        }
+      }
+    }
+
+    // Connettori di sfondo in base alla variante
+    c.save();
+    if (S.variant === 3) {
+      // D · Piste Circuito Lab (si illuminano sul nodo armato!)
+      for (const n of nodes) {
+        const a = n.act;
+        const lit = a.armed || S.hoverId === a.id;
+        c.beginPath();
+        const mx = (cx + n.x) * 0.5, my = (cy + n.y) * 0.5;
+        c.moveTo(cx, cy); c.lineTo(mx, cy); c.lineTo(n.x, n.y);
+        c.strokeStyle = a.locked ? 'rgba(71,85,105,0.22)' : (lit ? (a.armed ? '#4ade80' : a.col) : (a.col + '55'));
+        c.lineWidth = lit ? 3 : 1.8;
+        c.stroke();
+      }
+    } else if (S.variant === 0 || S.variant === 1) {
+      // Sottile anello guida esagonale / circolare
+      c.beginPath(); c.arc(cx, cy, R * 0.96 * ease, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(148, 163, 184, 0.22)'; c.lineWidth = 1.6; c.stroke();
+    } else if (S.variant === 2) {
+      // Linee orizzontali corte per il Nido d'Ape Laterale
+      for (const n of nodes) {
+        c.beginPath(); c.moveTo(cx, cy); c.lineTo(n.x, n.y);
+        c.strokeStyle = n.act.locked ? 'rgba(71,85,105,0.20)' : (n.act.col + '40');
+        c.lineWidth = 1.6; c.stroke();
+      }
+    } else if (S.variant === 4) {
+      // E · Cornice esagonale esterna sottile pixel-style
+      hexPath(c, cx, cy, R * 0.92 * ease, true);
+      c.strokeStyle = 'rgba(232, 176, 74, 0.30)'; c.lineWidth = 2; c.stroke();
+    }
+    c.restore();
+
+    // Disegna i nodi esagonali
+    const nodeOpts = {
+      glow: S.variant === 1 || S.variant === 3,
+      pixelCrisp: S.variant === 4,
+      costPill: S.variant === 4,
+      flatTop: S.variant === 2,
+    };
+    for (const n of nodes) {
+      const rNode = n.act.kind === 'sell' ? 24 : hexRad;
+      drawHexNode(c, n, rNode, nodeOpts);
+    }
+
+    // Indicatori 4 slot DNA (posizionamento diverso per ogni variante)
+    if (S.hasTower) {
+      if (S.variant === 0 || S.variant === 4) {
+        drawHexPips(c, cx, cy - 36 * ease, 13, 5, previewCol);
+      } else if (S.variant === 2) {
+        drawHexPips(c, cx, cy - 42 * ease, 14, 5.5, previewCol);
+      } else if (S.variant === 3) {
+        // Sotto il gatto sopra il tasto Vendi, con preview pulsante
+        drawHexPips(c, cx, cy + 36 * ease, 14, 5.5, previewCol);
+      }
+    }
+
+    // Pillola Compatta sempre in alto (in variante B include i 4 pip DNA inline!)
+    drawCompactPill(c, cx, topEdgeY, S.variant === 1, previewCol);
+  }
+
+  // --- HIT TEST & EVENTI ---
+  function hitBtn(mx, my) {
+    for (const b of S.btns) if (Math.hypot(mx - b.x, my - b.y) <= b.r) return b;
+    return null;
+  }
+
+  uiCv.addEventListener('pointermove', e => {
+    const r = uiCv.getBoundingClientRect();
+    const h = hitBtn(e.clientX - r.left, e.clientY - r.top);
+    S.hoverId = h ? h.id : null;
+    uiCv.style.cursor = h ? (h.act.locked ? 'not-allowed' : 'pointer') : 'default';
+  });
+
+  uiCv.addEventListener('pointerdown', e => {
+    const r = uiCv.getBoundingClientRect();
+    const h = hitBtn(e.clientX - r.left, e.clientY - r.top);
+    if (!h) {
+      if (S.armedId) { S.armedId = null; drawBackdrop(); syncHUDInfo(); }
+      return;
+    }
+    const a = h.act;
+    if (a.locked) {
+      S.armedId = null;
+      toast(a.reason === 'max' ? 'Tutti i 4 slot DNA sono pieni!' : 'Bloccato: max 2 elementi diversi per torre!');
+      drawBackdrop(); syncHUDInfo(); return;
+    }
+    if (a.kind !== 'sell' && S.dnaGold < a.cost) {
+      S.armedId = null;
+      toast('DNA insufficiente (' + a.cost + ' richiesti)!');
+      drawBackdrop(); syncHUDInfo(); return;
+    }
+    // 1° TAP: Arma conferma
+    if (S.armedId !== a.id) {
+      S.armedId = a.id;
+      drawBackdrop(); syncHUDInfo(); return;
+    }
+    // 2° TAP: Conferma ed esegue!
+    S.armedId = null;
+    if (a.kind === 'build') {
+      S.dnaGold -= a.cost; S.hasTower = true; S.dna = []; S.openAnim = 0.2;
+      toast('✓ Gatto Base piazzato!');
+    } else if (a.kind === 'elem') {
+      S.dnaGold -= a.cost; S.dna.push(a.elemId);
+      toast('✓ Evoluto → ' + catProfile(S.dna).name);
+    } else if (a.kind === 'sell') {
+      const ref = Math.floor(spentDNA() * 0.5);
+      S.dnaGold += ref; S.hasTower = false; S.dna = []; S.openAnim = 0.2;
+      toast('✓ Venduto (+' + ref + ' DNA)');
+    }
+    drawBackdrop(); syncHUDInfo();
+  });
+
+  // --- CONTROLLI TOPBAR ---
+  document.querySelectorAll('#varGrp button').forEach(btn => {
+    btn.onclick = () => {
+      S.variant = +btn.dataset.var; S.openAnim = 0.15; S.armedId = null;
+      document.querySelectorAll('#varGrp button').forEach(b => b.classList.toggle('active', b === btn));
+      drawBackdrop(); syncHUDInfo();
+    };
+  });
+  document.querySelectorAll('#presetGrp button').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.preset; S.armedId = null; S.openAnim = 0.2;
+      if (p === 'empty') { S.hasTower = false; S.dna = []; }
+      else if (p === 'base') { S.hasTower = true; S.dna = []; }
+      else if (p === 'one')  { S.hasTower = true; S.dna = ['fire']; }
+      else if (p === 'two')  { S.hasTower = true; S.dna = ['fire', 'elec']; }
+      else if (p === 'max')  { S.hasTower = true; S.dna = ['fire', 'fire', 'elec', 'elec']; }
+      document.querySelectorAll('#presetGrp button').forEach(b => b.classList.toggle('active', b === btn));
+      drawBackdrop(); syncHUDInfo();
+    };
+  });
+  document.querySelectorAll('#rosterGrp button').forEach(btn => {
+    btn.onclick = () => {
+      S.rosterSize = +btn.dataset.roster; S.armedId = null;
+      document.querySelectorAll('#rosterGrp button').forEach(b => b.classList.toggle('active', b === btn));
+      drawBackdrop(); syncHUDInfo();
+    };
+  });
+  const slDist = document.getElementById('slDist'), vDist = document.getElementById('vDist');
+  slDist.oninput = () => { S.dist = +slDist.value; vDist.textContent = S.dist; };
+
+  document.getElementById('btnDnaToggle').onclick = () => {
+    S.dnaGold = S.dnaGold >= 180 ? 35 : (S.dnaGold === 35 ? 90 : 300);
+    syncHUDInfo();
+  };
+
+  window.addEventListener('resize', resize);
+  resize(); syncHUDInfo();
+
+  let lastT = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now; S.t += dt;
+    S.openAnim = Math.min(1, S.openAnim + dt * 5.0);
+    ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawCenterPad(ctx);
+    drawMenu(ctx);
+    ctx.restore();
+  }
+  loop(lastT);
+  </script>
+</body>
+</html>

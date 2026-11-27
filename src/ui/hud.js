@@ -484,6 +484,86 @@ const UI = (() => {
   function text(str, x, y, col, o) { return PX.text(U.ctx, str, x, y, U.s, col || COLR.tx, o); }
   const tw = str => PX.measure(str) * U.s;
 
+  const RADIAL_ELEMS = [
+    { id: 'fire', name: 'Fuoco', tag: 'TERRA', col: '#ff7832', icon: 'flame' },
+    { id: 'elec', name: 'Laser', tag: 'ARIA',  col: '#38bdf8', icon: 'bolt'  },
+  ];
+
+  function hexPath(c, x, y, rad) {
+    c.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + (i * Math.PI) / 3;
+      const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.closePath();
+  }
+  function rrect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  function canAddDna(dna, elemId) {
+    if (dna.length >= 4) return { ok: false, reason: 'max' };
+    const dist = [];
+    for (let i = 0; i < dna.length; i++) if (!dist.includes(dna[i])) dist.push(dna[i]);
+    if (dist.length >= 2 && !dist.includes(elemId)) return { ok: false, reason: 'locked2' };
+    return { ok: true, reason: null };
+  }
+  function drawLockMark(c, x, y, sz) {
+    c.save(); c.translate(x, y);
+    c.strokeStyle = '#94a3b8'; c.lineWidth = Math.max(1.6, sz * 0.1);
+    c.beginPath(); c.arc(0, -sz * 0.14, sz * 0.18, Math.PI, 0); c.stroke();
+    c.fillStyle = '#334155';
+    rrect(c, -sz * 0.26, -sz * 0.12, sz * 0.52, sz * 0.42, Math.max(2, sz * 0.12)); c.fill();
+    c.strokeStyle = '#cbd5e1'; c.lineWidth = Math.max(1.2, sz * 0.07); c.stroke();
+    c.fillStyle = '#fbbf24';
+    c.beginPath(); c.arc(0, sz * 0.08, Math.max(1.5, sz * 0.06), 0, TAU); c.fill();
+    c.restore();
+  }
+  function drawConfirmMark(c, x, y, sz, isSell) {
+    const pulse = 1 + Math.sin(G.t * 10) * 0.08;
+    c.save(); c.translate(x, y); c.scale(pulse, pulse);
+    c.beginPath(); c.arc(0, 0, sz * 0.46, 0, TAU);
+    c.fillStyle = isSell ? 'rgba(220, 38, 38, 0.86)' : 'rgba(22, 163, 74, 0.88)';
+    c.fill();
+    c.lineWidth = Math.max(1.6, sz * 0.08);
+    c.strokeStyle = isSell ? '#fecaca' : '#bbf7d0';
+    c.stroke();
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = Math.max(2.2, sz * 0.13);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(-sz * 0.22, sz * 0.02);
+    c.lineTo(-sz * 0.05, sz * 0.19);
+    c.lineTo(sz * 0.24, -sz * 0.17);
+    c.stroke();
+    c.restore();
+  }
+  function drawHexPips(c, cx, cy, dna, gap, rad, previewCol) {
+    const x0 = cx - (3 * gap) / 2;
+    for (let i = 0; i < 4; i++) {
+      const px = x0 + i * gap, id = dna[i];
+      const col = id === 'fire' ? '#ff7832' : (id === 'elec' ? '#38bdf8' : null);
+      const isNext = !col && previewCol && i === dna.length;
+      c.save();
+      if (isNext) {
+        const p = 1 + Math.sin(G.t * 10) * 0.16;
+        c.translate(px, cy); c.scale(p, p); c.translate(-px, -cy);
+      }
+      hexPath(c, px, cy, rad);
+      c.fillStyle = col || (isNext ? previewCol : '#152033');
+      if (isNext) c.globalAlpha = 0.78;
+      c.fill();
+      c.globalAlpha = 1;
+      c.lineWidth = col || isNext ? Math.max(1.4, rad * 0.26) : Math.max(1.0, rad * 0.2);
+      c.strokeStyle = col || isNext ? '#ffffff' : '#475569';
+      c.stroke();
+      c.restore();
+    }
+  }
+
   function initUI() {
     const cv = document.getElementById('hud'); U.ctx = cv.getContext('2d'); U.ctx.imageSmoothingEnabled = false;
     const mk = (seg, col) => {
@@ -578,7 +658,7 @@ const UI = (() => {
       else if (k === ' ' || k === 'Enter') { callWave(); e.preventDefault(); }
       else if (k === 'Escape') { U.closeMenu(); if (typeof CHARGE !== 'undefined') CHARGE.cancel(); }
       else if (k === 'q' || k === 'Q') { toggleCharge(); e.preventDefault(); }
-      else if (k === 'x' || k === 'X' || k === 'Delete' || k === 'Backspace') { const t = U.menu && U.menu.tower; if (t) { touchInput(); if (U.menu.sellArm) doSell(t); else { U.menu.sellArm = true; sfx('uiHover', t.x, t.z, .8); } } }
+      else if (k === 'x' || k === 'X' || k === 'Delete' || k === 'Backspace') { const t = U.menu && U.menu.tower; if (t) { touchInput(); if (U.menu.armedId === 'sell') doSell(t); else { U.menu.armedId = 'sell'; sfx('uiHover', t.x, t.z, .8); } } }
       else if (k === 'p' || k === 'P') { togglePause(); }
       else if (k === 'Tab') { cycleSpeed(); e.preventDefault(); }
       else if (k === '0') { camReset(); }
@@ -629,7 +709,12 @@ const UI = (() => {
   }
   function buzz(p) { if (U.touch && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } }
   function inRect(r, x, y, min = 0) {
-    if (!r) return false; const m = min * (R.dpr || 1), mw = Math.max(0, m - r.w) / 2, mh = Math.max(0, m - r.h) / 2;
+    if (!r) return false;
+    if (r.cx !== undefined && r.rad !== undefined) {
+      const rr2 = Math.max(r.rad, min * (R.dpr || 1) * 0.5);
+      return Math.hypot(x - r.cx, y - r.cy) <= rr2;
+    }
+    const m = min * (R.dpr || 1), mw = Math.max(0, m - r.w) / 2, mh = Math.max(0, m - r.h) / 2;
     return x >= r.x - mw && x <= r.x + r.w + mw && y >= r.y - mh && y <= r.y + r.h + mh;
   }
   function btnAt(x, y) { const m = U.touch ? 44 : 0; for (const b of U.btns) if (inRect(b, x, y, m)) return b; for (const b of U.hud) if (inRect(b, x, y, m)) return b; return null; }
@@ -640,7 +725,15 @@ const UI = (() => {
   function toggleCommand() { U.setManual(!U.manual); U.idle = 0; sfx('uiClick', CAM.x, CAM.z, .8); }
   function deny() { U.deny = 1; sfx('uiDeny', CAM.x, CAM.z, .6); buzz([18, 40, 18]); }
   function doBuild(pad, kind) { touchInput(); if (buildTower(pad, kind || 'archer', true)) { sfx('uiClick', pad.x, pad.z, .8); buzz(12); U.menu = null; U.armed = null; return true; } deny(); return false; }
-  function doMutate(t, elem) { if (mutateTower(t, elem, true)) { sfx('uiClick', t.x, t.z, .8); buzz(12); U.menu = null; return true; } deny(); return false; }
+  function doMutate(t, elem) {
+    if (mutateTower(t, elem, true)) {
+      sfx('uiClick', t.x, t.z, .8); buzz(12);
+      if (U.menu && U.menu.tower === t && t.lvl < 4) { U.menu.armedId = null; }
+      else U.menu = null;
+      return true;
+    }
+    deny(); return false;
+  }
   function doSell(t) { if (sellTower(t)) { U.menu = null; return true; } return false; }
   function pickKind(kind) {
     touchInput();
@@ -671,7 +764,7 @@ const UI = (() => {
       touchInput(); U.lastTap.t = -9;
       if (!h.tower && U.armed) { doBuild(h.pad, U.armed); return; }
       if (U.menu && U.menu.pad === h.pad) { U.menu = null; return; }
-      U.menu = { pad: h.pad, tower: h.tower, t: 0, focus: 0, sel: null, sellArm: false }; U.armed = null; sfx('uiHover', h.pad.x, h.pad.z, .9); buzz(6); return;
+      U.menu = { pad: h.pad, tower: h.tower, t: 0, focus: 0, sel: null, armedId: null }; U.armed = null; sfx('uiHover', h.pad.x, h.pad.z, .9); buzz(6); return;
     }
     if (U.menu || U.armed) { U.menu = null; U.armed = null; U.lastTap.t = -9; return; }
     if (now - U.lastTap.t < 330 && Math.hypot(x - U.lastTap.x, y - U.lastTap.y) < 40 * (R.dpr || 1)) { U.lastTap.t = -9; if (CAM.man && CAM.mzoom > 1.3) camReset(); else camZoomTo(Math.max(1.9, (CAM.man ? CAM.mzoom : CAM.zoom) * 1.6), x, y); }
@@ -698,7 +791,7 @@ const UI = (() => {
       }
     }
     if (!ax && !ay) st.t = 0;
-    if (hit(0)) { touchInput(); audioGesture(); st.active = true; if (st.sel < 0) st.sel = 0; if (U.menu) { const bt = U.btns[U.menu.focus]; if (bt) bt.fn(); } else { const pad = G.B.pads[st.sel]; U.menu = { pad, tower: pad.tower, t: 0, focus: 0, sel: null, sellArm: false }; sfx('uiHover', pad.x, pad.z, .9); } }
+    if (hit(0)) { touchInput(); audioGesture(); st.active = true; if (st.sel < 0) st.sel = 0; if (U.menu) { const bt = U.btns[U.menu.focus]; if (bt) bt.fn(); } else { const pad = G.B.pads[st.sel]; U.menu = { pad, tower: pad.tower, t: 0, focus: 0, sel: null, armedId: null }; sfx('uiHover', pad.x, pad.z, .9); } }
     if (hit(1)) { U.closeMenu(); touchInput(); }
     if (hit(2)) { const pad = st.sel >= 0 ? G.B.pads[st.sel] : null; if (pad && pad.tower) { touchInput(); doMutate(pad.tower, 'fire'); } }
     if (hit(3) || hit(9)) callWave();
@@ -730,10 +823,13 @@ const UI = (() => {
       setRing(U.padMesh, pad.x, pad.z, 1.5, .1); U.padMesh.material.opacity = .45 + .25 * pulse;
       let range = TOWER.archer.range[0], rCol = [1.5, 1.15, .6];
       if (tgt.tower) {
-        const previewElem = U.menu && U.hotBtn && U.hotBtn.elem;
-        const pr = (previewElem && tgt.tower.lvl < 4) ? catProfile(tgt.tower.dna.concat([previewElem])) : tgt.tower.prof;
+        const armedElem = (U.menu && U.menu.armedId && U.menu.armedId.startsWith('m')) ? U.menu.armedId.slice(1) : null;
+        const previewElem = armedElem || (U.menu && U.hotBtn && U.hotBtn.elem);
+        const pr = (previewElem && tgt.tower.lvl < 4 && canAddDna(tgt.tower.dna, previewElem).ok) ? catProfile(tgt.tower.dna.concat([previewElem])) : tgt.tower.prof;
         range = pr.range;
         rCol = pr.model === 'elec' ? [.55, 1.45, 2.0] : (pr.model === 'fire' ? [1.9, .85, .35] : [1.5, 1.15, .6]);
+      } else if (U.menu && U.menu.armedId === 'barcher') {
+        rCol = [1.2, 2.0, 1.0];
       }
       U.rangeMesh.material.color.setRGB(rCol[0], rCol[1], rCol[2]);
       setRing(U.rangeMesh, pad.x, pad.z, range, .07); U.rangeMesh.material.opacity = .36;
@@ -873,98 +969,183 @@ const UI = (() => {
     }
     U.menuRect = null;
     if (U.menu && G.phase === 'play') {
-      const m = U.menu, p = proj(m.pad.x, m.pad.y + (m.tower ? Math.min(3.6, m.tower.mounts.top) : 1.2), m.pad.z), a = sat(m.t * 8), mp = 6 * s;
-      const button = (bx, by, bw2, bh2, id, enabled, fn, extra) => {
-        const ov = over(bx, by, bw2, bh2) && !U.gp.active, focused = U.gp.active && U.btns.length === m.focus;
-        const b = Object.assign({ id, fn, x: bx, y: by, w: bw2, h: bh2 }, extra || {}); U.btns.push(b); if (ov) hot = b; const down = U.press === id, lit = ov || focused || (extra && extra.on) || down;
-        plate(bx, by + (down ? s : 0), bw2, bh2, { bg: lit ? COLR.bg2 : 'rgba(16,18,27,0.96)', bd: lit ? COLR.bdHi : (enabled ? COLR.bd : '#3a342c'), hi: lit ? 'rgba(232,176,74,0.18)' : null });
-        return { lit, dy: down ? s : 0 };
-      };
-      const place = (wP, hP) => { const below = p.y - hP - 7 * s < y0 + topH + 2 * s && p.y + 26 * s + hP < Hb - 4 * s; return [clamp(Math.round(p.x - wP / 2), 4 * s + iL, Wr - wP - 4 * s), below ? Math.round(p.y + 26 * s) : clamp(Math.round(p.y - hP - 7 * s), Math.min(y0 + topH + 4 * s, Hb - hP - 4 * s), Hb - hP - 4 * s)]; };
-      c.globalAlpha = a;
-      if (!m.tower) {
-        // Piazzamento diretto del Gatto Base (50 DNA) — GDD 3.7
-        const d = TOWER.archer, can = G.gold >= d.cost[0];
-        const l1 = d.desc[0], l2 = d.desc[1], btnLbl = 'Piazza Gatto Base · ' + d.cost[0];
-        const [iw, ih] = PX.iconSize('archer');
-        const bh = Math.max((ih + 8) * s, (tch ? 26 : 21) * s);
-        const wBtn = iw * s + 10 * s + tw(btnLbl) + 12 * s;
-        const wP = Math.max(wBtn, tw(l1), tw(l2)) + mp * 2;
-        const hP = mp * 2 + LH + 3 * s + bh + 4 * s + LH * 2 + 2 * s;
-        const [px, py] = place(wP, hP);
-        U.menuRect = { x: px, y: py, w: wP, h: hP };
-        plate(px, py, wP, hP);
-        text('Piazzola Libera', px + mp, py + mp - s, COLR.amber);
-        const by = py + mp + LH + 3 * s, bwf = wP - mp * 2;
-        const r = button(px + mp, by, bwf, bh, 'barcher', can, () => doBuild(m.pad, 'archer'), { kind: 'archer' });
-        PX.icon(c, 'archer', px + mp + 6 * s, by + Math.round((bh - ih * s) / 2) + r.dy, s, can ? 1 : .45);
-        text(btnLbl, px + mp + 6 * s + iw * s + 5 * s, by + Math.round((bh - LH) / 2) + r.dy + s, can ? COLR.tx : COLR.red);
-        const ty = by + bh + 4 * s;
-        text(l1, px + mp, ty, COLR.dim);
-        text(l2, px + mp, ty + LH + s, COLR.ok);
+      const m = U.menu, t = m.tower;
+      const p0 = proj(m.pad.x, m.pad.y + (t ? 1.1 : 0.4), m.pad.z);
+      const ease = 1 - Math.pow(1 - sat(m.t * 5.2), 3);
+      const aAlpha = sat(m.t * 8);
+      const uScale = Math.max(dpr, s * 0.42);
+      const hexRad = Math.round((tch ? 30 : 27) * uScale);
+      const sellRad = Math.round((tch ? 25 : 23) * uScale);
+      const Rdist = Math.round((tch ? 78 : 72) * uScale);
+      const pillH = LH + pad * 2 - 2 * s;
+
+      // Clamp centro del menu radiale per non uscire mai dallo schermo o coprire HUD
+      const marginX = Rdist + hexRad + 8 * s;
+      const topLimit = y0 + topH + Rdist + hexRad + pillH + 10 * s;
+      const botLimit = yB - Rdist - sellRad - 6 * s;
+      const cx = Math.round(clamp(p0.x, iL + marginX, Wr - marginX));
+      const cy = Math.round(clamp(p0.y, Math.min(topLimit, botLimit), Math.max(topLimit, botLimit)));
+
+      // Rettangolo bounding per evitare pan accidentali dentro il menu
+      U.menuRect = { x: cx - Rdist - hexRad, y: cy - Rdist - hexRad - pillH - 8 * s, w: (Rdist + hexRad) * 2, h: (Rdist + hexRad) * 2 + pillH + 8 * s };
+
+      // Costruisci elenco nodi esagonali
+      const nodes = [];
+      let topEdgeY = cy - Rdist - hexRad;
+
+      if (!t) {
+        const cost0 = DNA_COSTS[0], can0 = G.gold >= cost0;
+        const ny = cy - Math.round(Rdist * 0.92 * ease);
+        topEdgeY = cy - Math.round(Rdist * 0.92) - hexRad;
+        nodes.push({
+          id: 'barcher', kind: 'build', icon: 'archer', label: 'Gatto Base',
+          cost: cost0, col: '#f59e0b', enabled: can0, locked: false, reason: can0 ? null : 'dna',
+          armed: m.armedId === 'barcher', x: cx, y: ny, rad: hexRad,
+          onConfirm: () => doBuild(m.pad, 'archer')
+        });
       } else {
-        // Menu Mutazione DNA (0-4 slot): Fuoco (Terra) o Laser/Elettrico (Aria)
-        const t = m.tower, pr = t.prof, maxed = t.lvl >= 4, upc = maxed ? 0 : DNA_COSTS[t.lvl + 1];
-        const can = !maxed && G.gold >= upc, refund = Math.floor(t.spent * .5);
-        const nameCol = pr.model === 'elec' ? COLR.cold : (pr.model === 'fire' ? COLR.ember : COLR.amber);
-        const st = '[' + pr.tag + '] Dmg ' + pr.dmg + ' · R ' + pr.range.toFixed(1) + (pr.splash > 0 ? ' · Spl ' + pr.splash.toFixed(1) : '');
+        const nextCost = t.lvl < 4 ? DNA_COSTS[t.lvl + 1] : 0;
+        const refRate = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg.sellRefund : .5;
+        const refund = Math.floor(t.spent * refRate);
+        const nEl = RADIAL_ELEMS.length;
+        const angs = nEl === 2
+          ? [-Math.PI * 0.78, -Math.PI * 0.22]
+          : [-Math.PI * 0.82, -Math.PI * 0.61, -Math.PI * 0.39, -Math.PI * 0.18];
 
-        const hovElem = U.hotBtn && U.hotBtn.elem;
-        let nx = maxed ? ('Max 4/4 DNA · ' + t.kills + ' kills') : 'Scegli fiala: Fuoco (1) o Laser (2)';
-        let nxCol = maxed ? COLR.dim : COLR.ok;
-        if (!maxed && hovElem) {
-          const np = catProfile(t.dna.concat([hovElem]));
-          nx = 'Next: ' + np.name + ' [' + np.tag + '] Dmg ' + np.dmg;
-          nxCol = hovElem === 'elec' ? COLR.cold : COLR.ember;
+        for (let i = 0; i < nEl; i++) {
+          const el = RADIAL_ELEMS[i];
+          const chk = canAddDna(t.dna, el.id);
+          const afford = G.gold >= nextCost;
+          const locked = !chk.ok;
+          const id = 'm' + el.id;
+          const rEl = nEl === 2 ? Rdist : Math.round(Rdist * 1.05);
+          nodes.push({
+            id, elem: el.id, kind: 'elem', icon: el.icon, label: el.name,
+            cost: nextCost, col: el.col, enabled: chk.ok && afford, locked,
+            reason: locked ? chk.reason : (afford ? null : 'dna'),
+            armed: m.armedId === id,
+            nextProf: chk.ok ? catProfile(t.dna.concat([el.id])) : null,
+            x: Math.round(cx + Math.cos(angs[i]) * rEl * ease),
+            y: Math.round(cy + Math.sin(angs[i]) * rEl * ease),
+            rad: hexRad,
+            onConfirm: () => doMutate(t, el.id)
+          });
         }
+        nodes.push({
+          id: 'sell', kind: 'sell', icon: 'sell', label: 'Vendi',
+          cost: '+' + refund, col: m.armedId === 'sell' ? '#ef4444' : '#e8b04a',
+          enabled: true, locked: false, reason: null,
+          armed: m.armedId === 'sell',
+          x: cx, y: Math.round(cy + Rdist * 0.90 * ease), rad: sellRad,
+          onConfirm: () => { buzz(16); doSell(t); }
+        });
+        topEdgeY = cy - Math.round((nEl === 2 ? Rdist * 0.64 : Rdist * 1.05)) - hexRad;
+      }
 
-        const fLbl = 'Fuoco ' + upc, eLbl = 'Laser ' + upc, sLbl = m.sellArm ? 'Ok +' + refund : 'Vendi +' + refund;
-        const iw9 = 9 * s, bh = (tch ? 24 : 16) * s, by0 = Math.round((bh - LH) / 2);
-        const bwOne = Math.max(tw(fLbl), tw(eLbl), tw(sLbl), tw('Vendi +999')) + iw9 + 9 * s;
-        const nBtns = maxed ? 2 : 3;
-        const rowW = nBtns * bwOne + (nBtns - 1) * 3 * s;
-        const wP = Math.max(rowW, tw(pr.name) + 30 * s, tw(st), tw(nx), tw('Next: Cyborg Pirotecnico [ARIA] Dmg 175')) + mp * 2;
-        const hP = mp * 2 + LH * 3 + 6 * s + bh;
-        const [px, py] = place(wP, hP);
-        U.menuRect = { x: px, y: py, w: wP, h: hP };
-        plate(px, py, wP, hP);
-        text(pr.name, px + mp, py + mp - s, nameCol);
+      c.save();
+      c.globalAlpha = aAlpha;
 
-        // 4 DNA slot pips colorati (Fuoco = rosso-arancio, Elettrico = azzurro, Vuoto = grigio)
-        for (let i = 0; i < 4; i++) {
-          const slIcon = t.dna[i] === 'fire' ? 'slotFire' : (t.dna[i] === 'elec' ? 'slotElec' : 'slotEmpty');
-          PX.icon(c, slIcon, px + wP - mp - (4 - i) * 6 * s, py + mp, s);
-        }
-        text(st, px + mp, py + mp + LH + s, COLR.tx);
-        text(nx, px + mp, py + mp + LH * 2 + 2 * s, nxCol);
+      // Sottile anello guida dell'Alveare Stretto
+      c.beginPath(); c.arc(cx, cy, Rdist * 0.94 * ease, 0, TAU);
+      c.strokeStyle = 'rgba(148, 163, 184, 0.24)';
+      c.lineWidth = Math.max(1.5, 1.5 * uScale);
+      c.stroke();
 
-        const by = py + mp + LH * 3 + 6 * s, bwf = Math.floor((wP - mp * 2 - (nBtns - 1) * 3 * s) / nBtns);
-        if (!maxed) {
-          let r = button(px + mp, by, bwf, bh, 'mfire', can, () => doMutate(t, 'fire'), { elem: 'fire' });
-          PX.icon(c, 'flame', px + mp + 3 * s, by + by0 + r.dy, s, can ? 1 : .4);
-          text(fLbl, px + mp + 3 * s + iw9 + 2 * s, by + by0 + r.dy, can ? COLR.tx : COLR.red);
+      // Disegna nodi esagonali + registra hit area in U.btns
+      let focusNode = null;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        const isSell = n.kind === 'sell';
+        const btnObj = {
+          id: n.id, elem: n.elem, cx: n.x, cy: n.y, rad: n.rad + 4 * uScale,
+          x: n.x - n.rad, y: n.y - n.rad, w: n.rad * 2, h: n.rad * 2,
+          fn: () => {
+            if (n.locked) { m.armedId = null; deny(); return; }
+            if (!isSell && !n.enabled) { m.armedId = null; deny(); return; }
+            // 1° TAP: arma e mostra segno di spunta ✓; 2° TAP sulla stessa icona: conferma!
+            if (m.armedId !== n.id) {
+              m.armedId = n.id;
+              sfx('uiHover', m.pad.x, m.pad.z, .85);
+              buzz(8);
+              return;
+            }
+            m.armedId = null;
+            n.onConfirm();
+          }
+        };
+        U.btns.push(btnObj);
+        const ov = mouse && Math.hypot(U.mx - n.x, U.my - n.y) <= n.rad + 3 * uScale && !U.gp.active;
+        const focused = U.gp.active && (U.btns.length - 1) === m.focus;
+        if (ov) hot = btnObj;
+        if (n.armed) focusNode = n;
+        else if (!focusNode && (ov || focused)) focusNode = n;
 
-          const x2 = px + mp + bwf + 3 * s;
-          r = button(x2, by, bwf, bh, 'melec', can, () => doMutate(t, 'elec'), { elem: 'elec' });
-          PX.icon(c, 'bolt', x2 + 3 * s, by + by0 + r.dy, s, can ? 1 : .4);
-          text(eLbl, x2 + 3 * s + iw9 + 2 * s, by + by0 + r.dy, can ? COLR.tx : COLR.red);
+        const dn = U.press === n.id;
+        const lit = ov || focused || n.armed || dn;
+        const bdCol = n.locked ? '#334155' : (n.armed ? (isSell ? '#ef4444' : '#4ade80') : (lit ? '#fde047' : (n.reason === 'dna' ? '#e5553c' : n.col)));
 
-          const x3 = x2 + bwf + 3 * s;
-          r = button(x3, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, { on: m.sellArm });
-          PX.icon(c, 'sell', x3 + 3 * s, by + by0 + r.dy, s);
-          text(sLbl, x3 + 3 * s + iw9 + 2 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
-        } else {
-          let r = button(px + mp, by, bwf, bh, 'max', false, () => {}, {});
-          PX.icon(c, 'upgrade', px + mp + 4 * s, by + by0 + r.dy, s, .35);
-          text('Max DNA', px + mp + 4 * s + iw9 + 3 * s, by + by0 + r.dy, COLR.dim);
+        c.save();
+        c.translate(n.x, n.y + (dn ? s : 0));
+        if ((lit && !n.locked) && !dn) c.scale(1.08, 1.08);
+        // Esagono con bordo scuro esterno + cornice colorata
+        hexPath(c, 0, 0, n.rad + 1.5 * uScale);
+        c.fillStyle = 'rgba(7, 10, 16, 0.92)'; c.fill();
+        hexPath(c, 0, 0, n.rad);
+        c.fillStyle = n.locked ? 'rgba(15,21,32,0.88)' : (n.armed ? (isSell ? 'rgba(59,21,26,0.96)' : 'rgba(19,46,34,0.96)') : (lit ? 'rgba(29,43,66,0.96)' : 'rgba(18,28,44,0.94)'));
+        c.fill();
+        c.lineWidth = Math.max(1.8, (n.armed || lit ? 2.6 : 2.0) * uScale);
+        c.strokeStyle = bdCol; c.stroke();
 
-          const x2 = px + mp + bwf + 3 * s;
-          r = button(x2, by, bwf, bh, 'sell', true, () => { if (!m.sellArm) { m.sellArm = true; sfx('uiHover', t.x, t.z, .8); } else { buzz(16); doSell(t); } }, { on: m.sellArm });
-          PX.icon(c, 'sell', x2 + 4 * s, by + by0 + r.dy, s);
-          text(sLbl, x2 + 4 * s + iw9 + 3 * s, by + by0 + r.dy, m.sellArm ? COLR.ember : COLR.tx);
+        // Icona pixel centrata
+        const [iw, ih] = PX.iconSize(n.icon);
+        const isc = Math.max(1, Math.round((n.rad * 0.92) / Math.max(iw, ih, 8)));
+        PX.icon(c, n.icon, -Math.round(iw * isc / 2), -Math.round(ih * isc / 2) - Math.round(n.rad * 0.16), isc, (n.locked || !n.enabled || n.armed) ? 0.34 : 1);
+
+        // Sovrapposizione Lucchetto o Segno di Spunta Conferma ✓
+        if (n.locked) drawLockMark(c, 0, -n.rad * 0.14, n.rad * 0.72);
+        else if (n.armed) drawConfirmMark(c, 0, -n.rad * 0.14, n.rad * 0.86, isSell);
+
+        // Costo / Stato nella parte bassa dell'esagono
+        const costTxt = n.locked ? (n.reason === 'max' ? 'MAX' : 'LOCK') : (n.armed ? 'OK' : String(n.cost));
+        const cCol = n.locked ? '#64748b' : (n.armed ? '#ffffff' : (n.reason === 'dna' ? COLR.red : (isSell ? COLR.amber : COLR.tx)));
+        const ks = Math.max(1, Math.round(s * 0.85));
+        PX.text(c, costTxt, 0, Math.round(n.rad * 0.30), ks, cCol, { align: 'c', outline: COLR.dark });
+        c.restore();
+      }
+
+      // 4 mini-esagoni DNA subito sopra la testa del gatto (con preview pulsante!)
+      if (t) {
+        const prevCol = (focusNode && focusNode.kind === 'elem' && !focusNode.locked) ? focusNode.col : null;
+        drawHexPips(c, cx, cy - Math.round(Rdist * 0.46 * ease), t.dna, Math.round(13 * uScale), Math.round(5.2 * uScale), prevCol);
+      }
+
+      // Pillola Compatta superiore
+      let pillTxt = t ? (t.prof.name + ' · ' + t.prof.tag) : 'Piazzola Libera';
+      let pillCol = t ? (t.prof.model === 'elec' ? COLR.cold : (t.prof.model === 'fire' ? COLR.ember : COLR.amber)) : COLR.amber;
+      if (focusNode) {
+        if (focusNode.kind === 'build') {
+          pillTxt = focusNode.armed ? ('OK? Gatto Base · ' + focusNode.cost) : ('Gatto Base · ' + focusNode.cost);
+          pillCol = focusNode.armed ? '#4ade80' : COLR.amber;
+        } else if (focusNode.kind === 'elem') {
+          if (focusNode.locked) {
+            pillTxt = focusNode.reason === 'max' ? 'DNA 4/4 (Max)' : (focusNode.label + ' Bloccato');
+            pillCol = COLR.dim;
+          } else if (focusNode.nextProf) {
+            pillTxt = (focusNode.armed ? 'OK? ' : '→ ') + focusNode.nextProf.name + ' [' + focusNode.nextProf.tag + ']';
+            pillCol = focusNode.armed ? '#4ade80' : focusNode.col;
+          }
+        } else if (focusNode.kind === 'sell') {
+          pillTxt = focusNode.armed ? ('OK? Vendi ' + focusNode.cost) : ('Vendi ' + focusNode.cost + ' DNA');
+          pillCol = focusNode.armed ? COLR.red : COLR.amber;
         }
       }
-      c.globalAlpha = 1;
+      const pw = tw(pillTxt) + pad * 2 + 4 * s;
+      const px = Math.round(clamp(cx - pw / 2, iL + 4 * s, Wr - pw - 4 * s));
+      const py = Math.round(clamp(topEdgeY - pillH - 6 * s, y0 + topH + 3 * s, Hb - pillH - 4 * s));
+      plate(px, py, pw, pillH, { bg: 'rgba(10,14,24,0.94)', bd: pillCol });
+      text(pillTxt, px + pw / 2, py + pad - s, pillCol, { align: 'c' });
+
+      c.restore();
     }
     if (hot !== U.hotBtn && hot) sfx('uiHover', CAM.x, CAM.z, .5);
     U.hotBtn = hot;

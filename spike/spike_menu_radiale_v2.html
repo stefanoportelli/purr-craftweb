@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purr-craft — Spike v2: Menu Radiale con Conferma a 2 Tap</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    body { background: #090d16; color: #e6edf3; overflow: hidden; user-select: none; height: 100vh; display: flex; flex-direction: column; }
+
+    /* Top Control Bar */
+    #topbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 10px 14px; background: rgba(12, 17, 28, 0.96);
+      border-bottom: 1px solid #24344d; z-index: 20;
+    }
+    .brand { font-weight: 800; font-size: 13.5px; color: #fbbf24; letter-spacing: 0.3px; margin-right: 4px; }
+    .grp { display: flex; align-items: center; gap: 4px; background: #0f1726; border: 1px solid #22324a; border-radius: 8px; padding: 3px; }
+    .grp-lbl { font-size: 10.5px; color: #7c93b2; font-weight: 700; text-transform: uppercase; padding: 0 6px; letter-spacing: 0.4px; }
+    button.pill {
+      background: transparent; color: #cbd5e1; border: 1px solid transparent;
+      border-radius: 6px; padding: 5px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+      transition: all 0.12s;
+    }
+    button.pill:hover { background: #1c2a40; color: #fff; }
+    button.pill.active { background: #2c2112; border-color: #f59e0b; color: #fde68a; }
+    button.pill.blue.active { background: #102a42; border-color: #38bdf8; color: #bae6fd; }
+    button.pill.green.active { background: #133123; border-color: #22c55e; color: #bbf7d0; }
+
+    /* Main Stage */
+    #stage-wrap { position: relative; flex: 1; overflow: hidden; }
+    canvas#bg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    canvas#ui { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+
+    /* Bottom Info Card */
+    #desc-bar {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+      max-width: 760px; width: calc(100% - 28px);
+      background: rgba(11, 16, 26, 0.92); border: 1px solid #2b3f5e; border-radius: 10px;
+      padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.55); pointer-events: auto; z-index: 15;
+    }
+    #desc-title { font-size: 13px; font-weight: 800; color: #fbbf24; margin-bottom: 2px; }
+    #desc-txt { font-size: 11.5px; color: #94a3b8; line-height: 1.38; }
+    .dna-badge {
+      flex-shrink: 0; text-align: right; font-size: 12px; color: #fde68a; font-weight: 700;
+      background: #172030; border: 1px solid #334868; border-radius: 8px; padding: 6px 10px;
+    }
+    .dna-badge small { display: block; font-size: 10px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
+
+    /* Toast feedback */
+    #toast {
+      position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #f59e0b; color: #fef3c7;
+      padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      opacity: 0; pointer-events: none; transition: opacity 0.18s; z-index: 30;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <span class="brand">🐾 Menu Radiale Spike</span>
+
+    <div class="grp" id="styleGrp">
+      <span class="grp-lbl">Proposta</span>
+      <button class="pill active" data-style="0">1. Anello Ferro (KR)</button>
+      <button class="pill" data-style="1">2. Biotech Lab</button>
+      <button class="pill" data-style="2">3. Esagono DNA</button>
+      <button class="pill" data-style="3">4. Arco Superiore</button>
+      <button class="pill" data-style="4">5. Pixel Minimal</button>
+      <button class="pill" data-style="5">6. Doppio Anello</button>
+    </div>
+
+    <div class="grp" id="textGrp">
+      <span class="grp-lbl">Testi</span>
+      <button class="pill blue" data-text="0">Zero Testi</button>
+      <button class="pill blue active" data-text="1">Compatto</button>
+      <button class="pill blue" data-text="2">Dettagliato</button>
+    </div>
+
+    <div class="grp" id="presetGrp">
+      <span class="grp-lbl">Stato Torre</span>
+      <button class="pill green" data-preset="empty">Libera</button>
+      <button class="pill green" data-preset="base">Base (0/4)</button>
+      <button class="pill green" data-preset="one">1 Elem (F)</button>
+      <button class="pill green active" data-preset="two">2 Elem (F+L · Lock!)</button>
+      <button class="pill green" data-preset="max">Max (4/4)</button>
+    </div>
+
+    <div class="grp">
+      <button class="pill" id="btnDnaToggle">DNA: 180</button>
+    </div>
+  </div>
+
+  <div id="stage-wrap">
+    <canvas id="bg"></canvas>
+    <canvas id="ui"></canvas>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="desc-bar">
+    <div>
+      <div id="desc-title">1. Anello Ferro (stile Kingdom Rush)</div>
+      <div id="desc-txt">Anello metallico rivettato centrato sulla piazzola con slot agli angoli e badge costo agganciato sotto ogni icona. Mantiene il gatto sempre visibile al centro.</div>
+    </div>
+    <div class="dna-badge" id="dnaBox">
+      🧬 180 DNA
+      <small>Clicca gli slot per testare</small>
+    </div>
+  </div>
+
+  <script>
+  'use strict';
+
+  // --- DATI ELEMENTI & REGOLE EVOLUZIONE (max 2 elementi distinti per torre) ---
+  const ELEMENTS = [
+    { id: 'fire',  name: 'Fuoco',  short: 'FUO', tag: 'TERRA', col: '#ff7832', colDark: '#7c2d12', glow: 'rgba(255,120,50,0.45)', icon: 'fire',  desc: 'Palla di fuoco Splash a terra' },
+    { id: 'elec',  name: 'Laser',  short: 'LAS', tag: 'ARIA',  col: '#38bdf8', colDark: '#0c4a6e', glow: 'rgba(56,189,248,0.45)', icon: 'elec',  desc: 'Raggio laser istantaneo Anti-Aria' },
+    { id: 'water', name: 'Gelo',   short: 'GEL', tag: 'TERRA', col: '#60a5fa', colDark: '#1e3a8a', glow: 'rgba(96,165,250,0.45)', icon: 'water', desc: 'Rallenta sciami e tank' },
+    { id: 'bio',   name: 'Bio',    short: 'BIO', tag: 'MISTO', col: '#4ade80', colDark: '#14532d', glow: 'rgba(74,222,128,0.45)', icon: 'bio',   desc: 'Acido corrosivo anti-corazza' },
+  ];
+  const DNA_COSTS = [50, 30, 50, 80, 120];
+
+  const STYLES = [
+    {
+      name: '1. Anello Ferro (stile Kingdom Rush)',
+      desc: 'Anello metallico rivettato centrato sulla piazzola con nodi cardinali/diagonali e targhetta costo sotto ogni icona. Gli elementi bloccati diventano grigi con lucchetto.'
+    },
+    {
+      name: '2. Biotech Lab (Olografico Circolare)',
+      desc: 'Anello radar luminoso a tema Laboratorio Segreto con 4 capsule fiale colorate, indicatore 4-slot DNA integrato nell\'arco superiore e anello di conferma vendita in basso.'
+    },
+    {
+      name: '3. Esagono DNA (Alveare Genetico)',
+      desc: 'Tessere esagonali compatte disposte a corona attorno al gatto. Ottima leggibilità su touch (hit-box larghe) e forte identità sci-fi/genetica.'
+    },
+    {
+      name: '4. Arco Superiore + Dock Vendita',
+      desc: 'Tutti gli elementi raggruppati in un ventaglio ergonomico sopra la torre (così il pollice non copre il gatto), con il solo tasto Vendi isolato in basso per evitare click accidentali.'
+    },
+    {
+      name: '5. Pixel Minimal (Ultra-Pulito)',
+      desc: 'Coerente al 100% con lo stile pixel-art attuale di Purr-craft: cornice sottile ad angoli smussati, zero decorazioni superflue, icone nitide e spazio libero attorno al gatto.'
+    },
+    {
+      name: '6. Doppio Anello (Slot + Anteprima Evoluzione)',
+      desc: 'Anello interno con i 4 slot DNA riempiti attorno alla base e anello esterno con le fiale; passando su una fiala mostra la freccia verso la forma evoluta (es. Gatto Plasma 2x2).'
+    },
+  ];
+
+  // --- STATO INTERATTIVO ---
+  const S = {
+    style: 0,
+    textLevel: 1, // 0 = Zero Testi, 1 = Compatto, 2 = Dettagliato
+    dnaGold: 180,
+    hasTower: true,
+    dna: ['fire', 'elec'], // Default: 2 elementi già inseriti -> Gelo & Bio bloccati!
+    armedId: null,
+    hoverId: null,
+    t: 0,
+    openAnim: 1,
+    cx: 0, cy: 0,
+    btns: [],
+    mouseX: -999, mouseY: -999,
+  };
+
+  function distinctElems(dna) {
+    const out = [];
+    for (const e of dna) if (!out.includes(e)) out.push(e);
+    return out;
+  }
+
+  function canAddElement(dna, elemId) {
+    if (dna.length >= 4) return { ok: false, reason: 'max' };
+    const dist = distinctElems(dna);
+    if (dist.length >= 2 && !dist.includes(elemId)) {
+      return { ok: false, reason: 'locked2' }; // Già 2 elementi diversi (A+B), terzo bloccato!
+    }
+    return { ok: true, reason: null };
+  }
+
+  function catProfile(dna) {
+    const n = dna.length;
+    if (n === 0) return { name: 'Gatto Base', tag: 'TERRA', dmg: 10, range: 4.4, splash: 0, col: '#e8b04a' };
+    const counts = {};
+    for (const e of dna) counts[e] = (counts[e] || 0) + 1;
+    const keys = Object.keys(counts);
+    if (keys.length === 2 && n === 4) {
+      if (counts.fire === 2 && counts.elec === 2) return { name: 'Gatto Plasma', tag: 'ARIA', dmg: 480, range: 8.5, splash: 0, col: '#e879f9' };
+      if (counts.fire === 3 && counts.elec === 1) return { name: 'Magma Volt', tag: 'TERRA', dmg: 135, range: 6.6, splash: 1.6, col: '#fb923c' };
+      if (counts.elec === 3 && counts.fire === 1) return { name: 'Cyborg Piro', tag: 'ARIA', dmg: 175, range: 7.5, splash: 0, col: '#38bdf8' };
+      return { name: 'Ibrido ' + keys.map(k => ELEMENTS.find(x => x.id === k).short).join('+'), tag: 'MISTO', dmg: 190, range: 7.0, splash: 1.2, col: '#a78bfa' };
+    }
+    const dom = keys.sort((a, b) => counts[b] - counts[a])[0];
+    const el = ELEMENTS.find(x => x.id === dom);
+    const dmgs = [10, 28, 60, 115, 200];
+    const rngs = [4.4, 5.2, 5.9, 6.6, 7.6];
+    const maxNames = { fire: 'Gatto Vulcano', elec: 'Gatto Cyborg', water: 'Gatto Glaciale', bio: 'Gatto Tossico' };
+    const nm = n === 4 ? maxNames[dom] : ('Gatto ' + el.name + ' Lv ' + n + (keys.length > 1 ? '*' : ''));
+    return { name: nm, tag: el.tag, dmg: dmgs[n], range: rngs[n], splash: dom === 'fire' ? (0.8 + n * 0.3) : 0, col: el.col };
+  }
+
+  function spentDNA() {
+    if (!S.hasTower) return 0;
+    let tot = DNA_COSTS[0];
+    for (let i = 1; i <= S.dna.length; i++) tot += DNA_COSTS[i];
+    return tot;
+  }
+
+  // --- TOAST FEEDBACK ---
+  let toastTimer = null;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  function syncHUDInfo() {
+    document.getElementById('desc-title').textContent = STYLES[S.style].name;
+    document.getElementById('desc-txt').textContent = STYLES[S.style].desc;
+    const dist = distinctElems(S.dna);
+    const lockNote = dist.length >= 2 && S.dna.length < 4
+      ? 'Max 2 elementi (' + dist.map(id => ELEMENTS.find(e => e.id === id).short).join('+') + ') · altri bloccati'
+      : (S.hasTower ? ('Slot DNA: ' + S.dna.length + '/4 · clicca per mutare') : 'Piazzola libera · clicca per costruire');
+    document.getElementById('dnaBox').innerHTML = `🧬 ${S.dnaGold} DNA<small>${S.armedId ? '✓ Riclicca l\'icona per confermare!' : lockNote}</small>`;
+    document.getElementById('btnDnaToggle').textContent = 'DNA: ' + S.dnaGold;
+  }
+
+  // --- CANVAS SETUP ---
+  const bgCv = document.getElementById('bg');
+  const uiCv = document.getElementById('ui');
+  const bgCtx = bgCv.getContext('2d');
+  const ctx = uiCv.getContext('2d');
+  let W = 1, H = 1, DPR = 1;
+
+  function resize() {
+    const r = document.getElementById('stage-wrap').getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height;
+    bgCv.width = uiCv.width = Math.round(W * DPR);
+    bgCv.height = uiCv.height = Math.round(H * DPR);
+    S.cx = W * 0.5;
+    S.cy = H * 0.47;
+    drawBackdrop();
+  }
+
+  // Sfondo isometrico stile Purr-craft Laboratorio
+  function drawBackdrop() {
+    const c = bgCtx;
+    c.save();
+    c.scale(DPR, DPR);
+    const grad = c.createRadialGradient(S.cx, S.cy, 40, S.cx, S.cy, Math.max(W, H) * 0.72);
+    grad.addColorStop(0, '#1c2a33');
+    grad.addColorStop(0.55, '#111a24');
+    grad.addColorStop(1, '#070b12');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, W, H);
+
+    // Griglia isometrica laboratorio
+    c.strokeStyle = 'rgba(120, 160, 190, 0.08)';
+    c.lineWidth = 1;
+    const step = 44;
+    for (let x = -H; x < W + H; x += step) {
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x + H * 1.4, H); c.stroke();
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x - H * 1.4, H); c.stroke();
+    }
+
+    // Strada curva sullo sfondo (in basso a sinistra -> destra)
+    c.save();
+    c.strokeStyle = '#33414d';
+    c.lineWidth = 56;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(W * 0.05, H * 0.78);
+    c.quadraticCurveTo(S.cx - 80, S.cy + 145, S.cx + 170, S.cy + 90);
+    c.quadraticCurveTo(W * 0.85, S.cy + 40, W * 0.96, H * 0.22);
+    c.stroke();
+
+    c.strokeStyle = '#475569';
+    c.lineWidth = 44;
+    c.stroke();
+    c.restore();
+
+    // Cerchio raggio d'attacco a terra (mostra anteprima se un'azione è armata!)
+    const armedElem = (S.armedId && S.armedId.startsWith('el_')) ? S.armedId.slice(3) : null;
+    const showRange = S.hasTower || S.armedId === 'build';
+    if (showRange) {
+      const baseDna = S.hasTower ? S.dna : [];
+      const pr = armedElem ? catProfile(baseDna.concat([armedElem])) : catProfile(baseDna);
+      const radPx = 150 + (pr.range - 4.4) * 28;
+      c.save();
+      c.translate(S.cx, S.cy + 8);
+      c.scale(1, 0.56);
+      c.beginPath();
+      c.arc(0, 0, radPx, 0, Math.PI * 2);
+      c.strokeStyle = (S.armedId ? pr.col + 'bb' : pr.col + '55');
+      c.lineWidth = S.armedId ? 3.2 : 2.5;
+      if (armedElem || S.armedId === 'build') c.setLineDash([8, 6]);
+      c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = pr.col + (S.armedId ? '18' : '0d');
+      c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+
+  // --- DISEGNO PIAZZOLA + GATTO AL CENTRO ---
+  function drawCenterPad(c) {
+    const x = S.cx, y = S.cy;
+    c.save();
+    // Base circolare isometrica
+    c.save();
+    c.translate(x, y + 10);
+    c.scale(1, 0.58);
+    c.beginPath(); c.arc(0, 0, 42, 0, Math.PI * 2);
+    c.fillStyle = '#1f2937'; c.fill();
+    c.lineWidth = 3; c.strokeStyle = S.hasTower ? '#64748b' : '#eab308'; c.stroke();
+
+    c.beginPath(); c.arc(0, -4, 32, 0, Math.PI * 2);
+    c.fillStyle = '#334155'; c.fill();
+    c.lineWidth = 2; c.strokeStyle = '#94a3b8'; c.stroke();
+    c.restore();
+
+    if (!S.hasTower) {
+      // Bandierina piazzola libera
+      c.strokeStyle = '#a16207'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(x, y + 8); c.lineTo(x, y - 22); c.stroke();
+      c.fillStyle = '#f59e0b';
+      c.beginPath(); c.moveTo(x, y - 22); c.lineTo(x + 18, y - 15); c.lineTo(x, y - 8); c.closePath(); c.fill();
+    } else {
+      // Gatto stilizzato al centro (cambia colore e taglia con il DNA)
+      const pr = catProfile(S.dna);
+      const sc = 0.85 + S.dna.length * 0.08;
+      const bob = Math.sin(S.t * 3.5) * 2;
+      c.save();
+      c.translate(x, y + bob);
+      c.scale(sc, sc);
+      // Corpo
+      c.fillStyle = pr.col;
+      roundRect(c, -15, -14, 30, 22, 7); c.fill();
+      c.strokeStyle = '#0b0d14'; c.lineWidth = 2; c.stroke();
+      // Orecchie
+      c.beginPath();
+      c.moveTo(-13, -12); c.lineTo(-16, -25); c.lineTo(-4, -15);
+      c.moveTo(13, -12);  c.lineTo(16, -25);  c.lineTo(4, -15);
+      c.fillStyle = pr.col; c.fill(); c.stroke();
+      // Occhi
+      c.fillStyle = '#0b0d14';
+      c.fillRect(-7, -7, 4, 5);
+      c.fillRect(3, -7, 4, 5);
+      // Monocolo se ha Laser
+      if (S.dna.includes('elec')) {
+        c.strokeStyle = '#38bdf8'; c.lineWidth = 2;
+        c.beginPath(); c.arc(5, -5, 6, 0, Math.PI * 2); c.stroke();
+      }
+      c.restore();
+    }
+    c.restore();
+  }
+
+  // --- UTILITY DISEGNO ICONE VETTORIALI NITIDE ---
+  function roundRect(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function hexPath(c, x, y, rad) {
+    c.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + (i * Math.PI) / 3;
+      const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.closePath();
+  }
+
+  function drawIcon(c, type, x, y, sz, dim) {
+    c.save();
+    c.translate(x, y);
+    if (dim) c.globalAlpha *= 0.35;
+    if (type === 'cat') {
+      c.fillStyle = '#f59e0b';
+      roundRect(c, -sz * 0.45, -sz * 0.25, sz * 0.9, sz * 0.65, 5); c.fill();
+      c.beginPath();
+      c.moveTo(-sz * 0.4, -sz * 0.2); c.lineTo(-sz * 0.46, -sz * 0.56); c.lineTo(-sz * 0.12, -sz * 0.25);
+      c.moveTo(sz * 0.4, -sz * 0.2);  c.lineTo(sz * 0.46, -sz * 0.56);  c.lineTo(sz * 0.12, -sz * 0.25);
+      c.fill();
+      c.fillStyle = '#0b0d14';
+      c.fillRect(-sz * 0.22, -sz * 0.04, sz * 0.13, sz * 0.16);
+      c.fillRect(sz * 0.09, -sz * 0.04, sz * 0.13, sz * 0.16);
+    } else if (type === 'fire') {
+      c.fillStyle = '#ff7832';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.56);
+      c.bezierCurveTo(sz * 0.48, -sz * 0.12, sz * 0.45, sz * 0.48, 0, sz * 0.52);
+      c.bezierCurveTo(-sz * 0.45, sz * 0.48, -sz * 0.48, -sz * 0.12, 0, -sz * 0.56);
+      c.fill();
+      c.fillStyle = '#fde047';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.14);
+      c.bezierCurveTo(sz * 0.22, sz * 0.08, sz * 0.18, sz * 0.38, 0, sz * 0.40);
+      c.bezierCurveTo(-sz * 0.18, sz * 0.38, -sz * 0.22, sz * 0.08, 0, -sz * 0.14);
+      c.fill();
+    } else if (type === 'elec') {
+      c.fillStyle = '#38bdf8';
+      c.beginPath();
+      c.moveTo(sz * 0.12, -sz * 0.56);
+      c.lineTo(-sz * 0.36, sz * 0.06);
+      c.lineTo(0, sz * 0.06);
+      c.lineTo(-sz * 0.14, sz * 0.56);
+      c.lineTo(sz * 0.36, -sz * 0.08);
+      c.lineTo(0, -sz * 0.08);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#e0f2fe';
+      c.beginPath(); c.arc(0, 0, sz * 0.12, 0, Math.PI * 2); c.fill();
+    } else if (type === 'water') {
+      c.fillStyle = '#60a5fa';
+      c.beginPath();
+      c.moveTo(0, -sz * 0.55);
+      c.bezierCurveTo(sz * 0.44, -sz * 0.02, sz * 0.42, sz * 0.48, 0, sz * 0.50);
+      c.bezierCurveTo(-sz * 0.42, sz * 0.48, -sz * 0.44, -sz * 0.02, 0, -sz * 0.55);
+      c.fill();
+      c.fillStyle = '#dbeafe';
+      c.beginPath(); c.arc(-sz * 0.12, sz * 0.12, sz * 0.10, 0, Math.PI * 2); c.fill();
+    } else if (type === 'bio') {
+      c.fillStyle = '#4ade80';
+      for (let i = 0; i < 3; i++) {
+        const a = -Math.PI / 2 + i * (Math.PI * 2 / 3);
+        c.beginPath(); c.arc(Math.cos(a) * sz * 0.22, Math.sin(a) * sz * 0.22, sz * 0.22, 0, Math.PI * 2); c.fill();
+      }
+      c.fillStyle = '#052e16';
+      c.beginPath(); c.arc(0, 0, sz * 0.15, 0, Math.PI * 2); c.fill();
+    } else if (type === 'sell') {
+      c.fillStyle = '#fbbf24';
+      c.beginPath(); c.arc(0, -sz * 0.08, sz * 0.36, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#92400e'; c.lineWidth = 2; c.stroke();
+      c.fillStyle = '#92400e';
+      c.font = `800 ${Math.round(sz * 0.45)}px system-ui`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText('+', 0, -sz * 0.06);
+      // Freccia giù rossa
+      c.fillStyle = '#ef4444';
+      c.beginPath();
+      c.moveTo(-sz * 0.22, sz * 0.30); c.lineTo(sz * 0.22, sz * 0.30); c.lineTo(0, sz * 0.54); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  function drawLockOverlay(c, x, y, sz) {
+    c.save();
+    c.translate(x, y);
+    c.strokeStyle = '#94a3b8'; c.lineWidth = 2.2;
+    c.beginPath(); c.arc(0, -sz * 0.14, sz * 0.18, Math.PI, 0); c.stroke();
+    c.fillStyle = '#334155';
+    roundRect(c, -sz * 0.26, -sz * 0.12, sz * 0.52, sz * 0.42, 3); c.fill();
+    c.strokeStyle = '#cbd5e1'; c.lineWidth = 1.6; c.stroke();
+    c.fillStyle = '#fbbf24';
+    c.beginPath(); c.arc(0, sz * 0.08, sz * 0.06, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+
+  function drawConfirmOverlay(c, x, y, sz, isSell) {
+    const pulse = 1 + Math.sin(S.t * 10) * 0.08;
+    c.save();
+    c.translate(x, y);
+    c.scale(pulse, pulse);
+    // Alone circolare traslucido dietro la spunta
+    c.beginPath(); c.arc(0, 0, sz * 0.48, 0, Math.PI * 2);
+    c.fillStyle = isSell ? 'rgba(220, 38, 38, 0.82)' : 'rgba(22, 163, 74, 0.86)';
+    c.fill();
+    c.lineWidth = 2.2;
+    c.strokeStyle = isSell ? '#fecaca' : '#bbf7d0';
+    c.stroke();
+    // Segno di spunta ✓ nitido
+    c.strokeStyle = '#ffffff';
+    c.lineWidth = Math.max(2.6, sz * 0.13);
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo(-sz * 0.22, sz * 0.02);
+    c.lineTo(-sz * 0.05, sz * 0.19);
+    c.lineTo(sz * 0.24, -sz * 0.17);
+    c.stroke();
+    c.restore();
+  }
+
+  // --- COSTRUZIONE AZIONI DISPONIBILI ---
+  function buildActions() {
+    if (!S.hasTower) {
+      const can = S.dnaGold >= DNA_COSTS[0];
+      const armed = S.armedId === 'build';
+      return [{
+        id: 'build', kind: 'build', icon: 'cat', label: 'Gatto Base', short: 'GATTO',
+        cost: DNA_COSTS[0], col: '#f59e0b', enabled: can, locked: false, armed,
+        reason: can ? null : 'dna',
+        sub: armed ? 'Riclicca per piazzare Gatto Base!' : 'Graffio rapido [TERRA]'
+      }];
+    }
+    const acts = [];
+    const nextCost = S.dna.length < 4 ? DNA_COSTS[S.dna.length + 1] : 0;
+    for (const el of ELEMENTS) {
+      const chk = canAddElement(S.dna, el.id);
+      const afford = S.dnaGold >= nextCost;
+      const locked = !chk.ok;
+      const enabled = chk.ok && afford;
+      const id = 'el_' + el.id;
+      const armed = S.armedId === id;
+      const nextProf = chk.ok ? catProfile(S.dna.concat([el.id])) : null;
+      acts.push({
+        id, elemId: el.id, kind: 'elem', icon: el.icon,
+        label: el.name, short: el.short, cost: nextCost, col: el.col,
+        enabled, locked, armed, reason: locked ? chk.reason : (afford ? null : 'dna'),
+        nextProf, sub: armed ? ('Riclicca per iniettare ' + el.name + '!') : el.desc
+      });
+    }
+    const ref = Math.floor(spentDNA() * 0.5);
+    const sellArm = S.armedId === 'sell';
+    acts.push({
+      id: 'sell', kind: 'sell', icon: 'sell',
+      label: sellArm ? 'Conferma Vendita?' : 'Vendi',
+      short: sellArm ? 'OK!' : '+' + ref,
+      cost: '+' + ref, col: sellArm ? '#ef4444' : '#fbbf24',
+      enabled: true, locked: false, armed: sellArm, reason: null,
+      sub: sellArm ? 'Riclicca per vendere (+' + ref + ' DNA)' : ('Rimborso 50%: +' + ref + ' DNA')
+    });
+    return acts;
+  }
+
+  // --- HEADER INFO OPZIONALE (Controllato da S.textLevel) ---
+  function drawInfoHeader(c, cx, topY) {
+    if (S.textLevel === 0) return; // Zero Testi!
+    const armedBtn = S.btns.find(b => b.id === S.armedId);
+    const hovBtn = S.btns.find(b => b.id === S.hoverId);
+    const focus = armedBtn ? armedBtn.act : (hovBtn ? hovBtn.act : null);
+
+    let title = S.hasTower ? catProfile(S.dna).name : 'Piazzola Libera';
+    let titleCol = S.hasTower ? catProfile(S.dna).col : '#fbbf24';
+    let line2 = '';
+
+    if (S.textLevel === 1) {
+      // Compatto: 1 sola pillola stretta (priorità al bottone armato in conferma!)
+      if (focus && focus.kind === 'build') {
+        title = focus.armed ? '✓ Conferma Gatto Base (' + focus.cost + ')' : 'Gatto Base · ' + focus.cost + ' DNA';
+        titleCol = focus.armed ? '#4ade80' : '#fbbf24';
+      } else if (focus && focus.kind === 'elem') {
+        if (focus.locked) {
+          title = focus.reason === 'max' ? 'DNA Completo (4/4)' : (focus.label + ' Bloccato (max 2 elem.)');
+          titleCol = '#94a3b8';
+        } else if (focus.nextProf) {
+          title = (focus.armed ? '✓ Conferma: ' : '→ ') + focus.nextProf.name + ' [' + focus.nextProf.tag + ']';
+          titleCol = focus.armed ? '#4ade80' : focus.col;
+        }
+      } else if (focus && focus.kind === 'sell') {
+        title = focus.armed ? '✓ Conferma Vendita (' + focus.cost + ')' : ('Vendi (' + focus.cost + ' DNA)');
+        titleCol = focus.armed ? '#f87171' : '#fbbf24';
+      } else if (S.hasTower) {
+        const pr = catProfile(S.dna);
+        title = pr.name + ' · ' + pr.tag;
+      }
+      c.font = '700 12px system-ui';
+      const tw = c.measureText(title).width;
+      const pw = tw + 22, ph = 26;
+      const px = cx - pw / 2, py = topY - ph - 10;
+      c.fillStyle = 'rgba(10, 14, 24, 0.92)';
+      roundRect(c, px, py, pw, ph, 13); c.fill();
+      c.strokeStyle = titleCol + 'aa'; c.lineWidth = 1.5; c.stroke();
+      c.fillStyle = titleCol; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(title, cx, py + ph / 2);
+      return;
+    }
+
+    // Dettagliato (textLevel === 2): 2 righe pulite
+    if (S.hasTower) {
+      const pr = catProfile(S.dna);
+      line2 = `[${pr.tag}] Dmg ${pr.dmg} · R ${pr.range.toFixed(1)}` + (pr.splash ? ` · Spl ${pr.splash.toFixed(1)}` : '');
+    } else {
+      line2 = 'Piazza Gatto Base (50 DNA) · evolvibile fino a 4 slot';
+    }
+    if (focus && focus.kind === 'build') {
+      title = focus.armed ? '✓ Conferma Piazzamento?' : 'Gatto Base';
+      titleCol = focus.armed ? '#4ade80' : '#fbbf24';
+      line2 = focus.armed ? ('Riclicca l\'icona per spendere ' + focus.cost + ' DNA') : focus.sub;
+    } else if (focus && focus.kind === 'elem') {
+      if (focus.locked) {
+        title = focus.label + ' — Bloccato';
+        titleCol = '#94a3b8';
+        line2 = focus.reason === 'max' ? 'Tutti i 4 slot DNA sono pieni' : 'Hai già 2 elementi diversi su questa torre';
+      } else if (focus.nextProf) {
+        title = (focus.armed ? '✓ Conferma → ' : 'Evolvi → ') + focus.nextProf.name;
+        titleCol = focus.armed ? '#4ade80' : focus.col;
+        line2 = `[${focus.nextProf.tag}] Dmg ${focus.nextProf.dmg} · R ${focus.nextProf.range.toFixed(1)} · ` + (focus.armed ? 'Riclicca per confermare!' : ('Costo ' + focus.cost + ' DNA'));
+      }
+    } else if (focus && focus.kind === 'sell') {
+      title = focus.label; titleCol = focus.col; line2 = focus.sub;
+    }
+
+    c.font = '700 12.5px system-ui';
+    const w1 = c.measureText(title).width;
+    c.font = '500 11px system-ui';
+    const w2 = c.measureText(line2).width;
+    const pw = Math.max(w1, w2) + 28, ph = 44;
+    const px = cx - pw / 2, py = topY - ph - 12;
+    c.fillStyle = 'rgba(10, 14, 24, 0.94)';
+    roundRect(c, px, py, pw, ph, 10); c.fill();
+    c.strokeStyle = titleCol + 'aa'; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = titleCol; c.font = '700 12.5px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(title, cx, py + 15);
+    c.fillStyle = '#cbd5e1'; c.font = '500 11px system-ui';
+    c.fillText(line2, cx, py + 31);
+  }
+
+  // Piccoli pallini DNA (4 slot) usati nei vari stili
+  function drawDnaPips(c, cx, cy, gap = 12, rad = 4.5) {
+    if (!S.hasTower) return;
+    const x0 = cx - (3 * gap) / 2;
+    for (let i = 0; i < 4; i++) {
+      const px = x0 + i * gap;
+      const id = S.dna[i];
+      const el = id ? ELEMENTS.find(e => e.id === id) : null;
+      c.beginPath(); c.arc(px, cy, rad, 0, Math.PI * 2);
+      c.fillStyle = el ? el.col : '#1e293b'; c.fill();
+      c.lineWidth = 1.6; c.strokeStyle = el ? '#fff' : '#475569'; c.stroke();
+    }
+  }
+
+  // =========================================================================
+  // RENDERER DELLE 6 PROPOSTE DI MENU RADIALE
+  // =========================================================================
+  function drawRadialMenu(c) {
+    S.btns = [];
+    const acts = buildActions();
+    const cx = S.cx, cy = S.cy;
+    const k = Math.min(1, S.openAnim);
+    const ease = 1 - Math.pow(1 - k, 3);
+
+    // Helper per posizionare bottoni su cerchio
+    const placeCircle = (R, angles) => {
+      if (!S.hasTower) return [{ act: acts[0], x: cx, y: cy - R * ease }];
+      return acts.map((act, i) => ({
+        act,
+        x: cx + Math.cos(angles[i]) * R * ease,
+        y: cy + Math.sin(angles[i]) * R * ease
+      }));
+    };
+
+    // -----------------------------------------------------------------------
+    // STILE 0: ANELLO FERRO (stile Kingdom Rush)
+    // -----------------------------------------------------------------------
+    if (S.style === 0) {
+      const R = 94;
+      // Anello metallico rivettato
+      c.save();
+      c.beginPath(); c.arc(cx, cy, R * ease, 0, Math.PI * 2);
+      c.strokeStyle = '#1e293b'; c.lineWidth = 14; c.stroke();
+      c.strokeStyle = '#64748b'; c.lineWidth = 9; c.stroke();
+      c.strokeStyle = '#94a3b8'; c.lineWidth = 2; c.stroke();
+      // Rivetti sull'anello
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        c.fillStyle = '#cbd5e1';
+        c.beginPath(); c.arc(cx + Math.cos(a) * R * ease, cy + Math.sin(a) * R * ease, 2.5, 0, Math.PI * 2); c.fill();
+      }
+      c.restore();
+
+      // 4 elementi sugli angoli in alto/lati + Vendi in basso
+      const angles = [-Math.PI * 0.78, -Math.PI * 0.22, Math.PI * 0.16, Math.PI * 0.84, Math.PI * 0.5];
+      const nodes = !S.hasTower
+        ? [{ act: acts[0], x: cx, y: cy - R * ease }]
+        : acts.map((act, i) => ({ act, x: cx + Math.cos(angles[i]) * R * ease, y: cy + Math.sin(angles[i]) * R * ease }));
+
+      if (S.hasTower) drawDnaPips(c, cx, cy - R * ease, 13, 5);
+
+      for (const n of nodes) {
+        const a = n.act, bw = 54, bh = 54;
+        const hov = S.hoverId === a.id;
+        S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: 32 });
+
+        // Cornice ottagonale ferro KR
+        c.save();
+        c.translate(n.x, n.y);
+        if (hov && !a.locked) c.scale(1.09, 1.09);
+        const isSell = a.kind === 'sell';
+        const colBd = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : (hov ? '#fbbf24' : '#94a3b8'));
+        if (a.armed) c.scale(1.08, 1.08);
+        c.fillStyle = a.locked ? '#131922' : (a.armed ? (isSell ? '#381519' : '#132d22') : (hov ? '#253145' : '#1b2433'));
+        roundRect(c, -bw / 2, -bh / 2, bw, bh, 9); c.fill();
+        c.lineWidth = 3.5; c.strokeStyle = '#0b0d14'; c.stroke();
+        c.lineWidth = a.armed ? 2.6 : 2; c.strokeStyle = colBd; c.stroke();
+
+        // Icona + eventuale segno di conferma in sovrapposizione
+        drawIcon(c, a.icon, 0, -4, 30, a.locked || !a.enabled || a.armed);
+        if (a.locked) drawLockOverlay(c, 0, -4, 24);
+        else if (a.armed) drawConfirmOverlay(c, 0, -4, 28, isSell);
+
+        // Badge costo agganciato in basso (esattamente come Kingdom Rush)
+        const tagW = 48, tagH = 19;
+        c.fillStyle = a.armed ? (isSell ? '#7f1d1d' : '#14532d') : (a.locked ? '#1e293b' : '#0f172a');
+        roundRect(c, -tagW / 2, bh / 2 - 9, tagW, tagH, 5); c.fill();
+        c.lineWidth = 1.6; c.strokeStyle = colBd; c.stroke();
+        c.font = '800 11px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        const txt = a.locked ? (a.reason === 'max' ? 'MAX' : 'LOCK') : (a.armed ? '✓ ' + a.cost : String(a.cost));
+        c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : (isSell ? '#fde047' : '#f8fafc')));
+        c.fillText(txt, 0, bh / 2 + 1);
+        c.restore();
+      }
+      drawInfoHeader(c, cx, cy - R - 34);
+    }
+
+    // -----------------------------------------------------------------------
+    // STILE 1: BIOTECH LAB (Olografico Circolare)
+    // -----------------------------------------------------------------------
+    else if (S.style === 1) {
+      const R = 98;
+      // Anello radar ciano/ambra pulsante
+      c.save();
+      c.beginPath(); c.arc(cx, cy, R * ease, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(56, 189, 248, 0.25)'; c.lineWidth = 2; c.stroke();
+      c.setLineDash([6, 8]);
+      c.beginPath(); c.arc(cx, cy, (R - 12) * ease, S.t * 0.4, S.t * 0.4 + Math.PI * 2);
+      c.strokeStyle = 'rgba(56, 189, 248, 0.4)'; c.lineWidth = 1.5; c.stroke();
+      c.setLineDash([]);
+      c.restore();
+
+      // 4 slot DNA integrati sull'arco superiore
+      if (S.hasTower) drawDnaPips(c, cx, cy - R * ease + 2, 15, 5.5);
+
+      const angles = [-Math.PI * 0.78, -Math.PI * 0.22, Math.PI * 0.14, Math.PI * 0.86, Math.PI * 0.5];
+      const nodes = placeCircle(R, angles);
+
+      for (const n of nodes) {
+        const a = n.act, rad = 28;
+        const hov = S.hoverId === a.id;
+        S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: rad + 4 });
+
+        c.save();
+        c.translate(n.x, n.y);
+        const isSell = a.kind === 'sell';
+        if ((hov || a.armed) && !a.locked) {
+          c.shadowColor = a.armed ? (isSell ? '#ef4444' : '#4ade80') : a.col; c.shadowBlur = 16;
+          c.scale(1.1, 1.1);
+        }
+        c.beginPath(); c.arc(0, 0, rad, 0, Math.PI * 2);
+        c.fillStyle = a.locked ? 'rgba(15, 23, 38, 0.75)' : (a.armed ? (isSell ? 'rgba(69,14,22,0.96)' : 'rgba(16,46,32,0.96)') : 'rgba(13, 22, 36, 0.94)');
+        c.fill();
+        c.lineWidth = (hov || a.armed) ? 2.8 : 2;
+        c.strokeStyle = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : (a.reason === 'dna' ? '#ef4444' : a.col));
+        c.stroke();
+        c.shadowBlur = 0;
+
+        drawIcon(c, a.icon, 0, -4, 28, a.locked || !a.enabled || a.armed);
+        if (a.locked) drawLockOverlay(c, 0, -4, 22);
+        else if (a.armed) drawConfirmOverlay(c, 0, -4, 26, isSell);
+
+        // Pillola costo luminosa
+        c.font = '800 10.5px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        const txt = a.locked ? '🔒' : (a.armed ? 'OK' : String(a.cost));
+        c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+        c.fillText(txt, 0, 17);
+        c.restore();
+      }
+      drawInfoHeader(c, cx, cy - R - 34);
+    }
+
+    // -----------------------------------------------------------------------
+    // STILE 2: ESAGONO DNA (Alveare Genetico)
+    // -----------------------------------------------------------------------
+    else if (S.style === 2) {
+      const R = 96;
+      // Linee di connessione esagonali dal centro
+      c.save();
+      const angles = [-Math.PI * 0.83, -Math.PI * 0.5, -Math.PI * 0.17, Math.PI * 0.17, Math.PI * 0.5];
+      // Se torre attiva: 4 elementi in alto/lati (simmetrici) + Vendi in basso
+      const ang2 = [-Math.PI * 0.76, -Math.PI * 0.24, Math.PI * 0.15, Math.PI * 0.85, Math.PI * 0.5];
+      const nodes = placeCircle(R, ang2);
+
+      for (const n of nodes) {
+        c.beginPath(); c.moveTo(cx, cy); c.lineTo(n.x, n.y);
+        c.strokeStyle = n.act.locked ? 'rgba(71,85,105,0.28)' : (n.act.col + '55');
+        c.lineWidth = 2; c.stroke();
+      }
+      c.restore();
+
+      if (S.hasTower) drawDnaPips(c, cx, cy - R * ease + 4, 13, 4.5);
+
+      for (const n of nodes) {
+        const a = n.act, rad = 32;
+        const hov = S.hoverId === a.id;
+        S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: rad });
+
+        c.save();
+        c.translate(n.x, n.y);
+        const isSell = a.kind === 'sell';
+        if ((hov || a.armed) && !a.locked) c.scale(1.09, 1.09);
+        hexPath(c, 0, 0, rad);
+        c.fillStyle = a.locked ? '#101622' : (a.armed ? (isSell ? '#3b151a' : '#132e22') : (hov ? '#1e2c42' : '#131d2d'));
+        c.fill();
+        c.lineWidth = (hov || a.armed) ? 3 : 2;
+        c.strokeStyle = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : (hov ? '#fde047' : a.col));
+        c.stroke();
+
+        drawIcon(c, a.icon, 0, -6, 26, a.locked || !a.enabled || a.armed);
+        if (a.locked) drawLockOverlay(c, 0, -5, 22);
+        else if (a.armed) drawConfirmOverlay(c, 0, -5, 26, isSell);
+
+        c.font = '800 10.5px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        const txt = a.locked ? (a.reason === 'max' ? 'MAX' : 'LOCK') : (a.armed ? '✓ ' + a.cost : String(a.cost));
+        c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+        c.fillText(txt, 0, 16);
+        c.restore();
+      }
+      drawInfoHeader(c, cx, cy - R - 38);
+    }
+
+    // -----------------------------------------------------------------------
+    // STILE 3: ARCO SUPERIORE + DOCK VENDITA (Ergonomico Touch)
+    // -----------------------------------------------------------------------
+    else if (S.style === 3) {
+      const R = 104;
+      // Arco superiore luminoso per le fiale
+      if (S.hasTower) {
+        c.save();
+        c.beginPath(); c.arc(cx, cy, R * ease, -Math.PI * 0.88, -Math.PI * 0.12);
+        c.strokeStyle = 'rgba(251, 191, 36, 0.35)'; c.lineWidth = 4; c.stroke();
+        c.restore();
+      }
+
+      const nodes = [];
+      if (!S.hasTower) {
+        nodes.push({ act: acts[0], x: cx, y: cy - 88 * ease });
+      } else {
+        // 4 fiale a ventaglio sopra (-148° .. -32°), Vendi isolato in basso (+90°)
+        const fan = [-Math.PI * 0.82, -Math.PI * 0.61, -Math.PI * 0.39, -Math.PI * 0.18];
+        for (let i = 0; i < 4; i++) {
+          nodes.push({ act: acts[i], x: cx + Math.cos(fan[i]) * R * ease, y: cy + Math.sin(fan[i]) * R * ease });
+        }
+        nodes.push({ act: acts[4], x: cx, y: cy + 78 * ease });
+      }
+
+      if (S.hasTower) drawDnaPips(c, cx, cy + 44 * ease, 12, 4.5);
+
+      for (const n of nodes) {
+        const a = n.act;
+        const isSell = a.kind === 'sell';
+        const hov = S.hoverId === a.id;
+        if (isSell) {
+          const bw = 96, bh = 30;
+          S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, w: bw, h: bh, rect: true });
+          c.save();
+          c.translate(n.x, n.y);
+          roundRect(c, -bw / 2, -bh / 2, bw, bh, 15);
+          c.fillStyle = a.armed ? '#7f1d1d' : (hov ? '#273449' : '#141c2b');
+          c.fill();
+          c.lineWidth = 2; c.strokeStyle = a.armed ? '#ef4444' : (hov ? '#fbbf24' : '#475569'); c.stroke();
+          drawIcon(c, 'sell', -26, 0, 18, a.armed);
+          if (a.armed) drawConfirmOverlay(c, -26, 0, 18, true);
+          c.font = '800 11.5px system-ui'; c.textAlign = 'left'; c.textBaseline = 'middle';
+          c.fillStyle = a.armed ? '#ffffff' : '#fde68a';
+          c.fillText(a.armed ? '✓ ' + a.cost : 'Vendi ' + a.cost, -12, 1);
+          c.restore();
+        } else {
+          const rad = 28;
+          S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: rad + 3 });
+          c.save();
+          c.translate(n.x, n.y);
+          if ((hov || a.armed) && !a.locked) c.scale(1.1, 1.1);
+          roundRect(c, -rad, -rad, rad * 2, rad * 2, 12);
+          c.fillStyle = a.locked ? '#101520' : (a.armed ? '#132d22' : (hov ? '#1f2d44' : '#141e2e'));
+          c.fill();
+          c.lineWidth = (hov || a.armed) ? 2.6 : 1.8;
+          c.strokeStyle = a.locked ? '#334155' : (a.armed ? '#4ade80' : (a.reason === 'dna' ? '#ef4444' : a.col));
+          c.stroke();
+          drawIcon(c, a.icon, 0, -6, 26, a.locked || !a.enabled || a.armed);
+          if (a.locked) drawLockOverlay(c, 0, -5, 22);
+          else if (a.armed) drawConfirmOverlay(c, 0, -5, 26, false);
+          c.font = '800 10.5px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+          c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+          c.fillText(a.locked ? 'LOCK' : (a.armed ? '✓ ' + a.cost : String(a.cost)), 0, 17);
+          c.restore();
+        }
+      }
+      drawInfoHeader(c, cx, cy - R - 34);
+    }
+
+    // -----------------------------------------------------------------------
+    // STILE 4: PIXEL MINIMAL (Ultra-Pulito, zero fronzoli)
+    // -----------------------------------------------------------------------
+    else if (S.style === 4) {
+      const R = 86;
+      // Sottile anello puntinato stile HUD pixel Purr-craft
+      c.save();
+      c.beginPath(); c.arc(cx, cy, R * ease, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(232, 176, 74, 0.35)'; c.lineWidth = 2; c.stroke();
+      c.restore();
+
+      const angles = [-Math.PI * 0.75, -Math.PI * 0.25, Math.PI * 0.25, Math.PI * 0.75, Math.PI * 0.5];
+      const nodes = !S.hasTower
+        ? [{ act: acts[0], x: cx, y: cy - 78 * ease }]
+        : [
+            { act: acts[0], x: cx - 72 * ease, y: cy - 52 * ease },
+            { act: acts[1], x: cx + 72 * ease, y: cy - 52 * ease },
+            { act: acts[2], x: cx - 72 * ease, y: cy + 44 * ease },
+            { act: acts[3], x: cx + 72 * ease, y: cy + 44 * ease },
+            { act: acts[4], x: cx,             y: cy + 92 * ease },
+          ];
+
+      if (S.hasTower) drawDnaPips(c, cx, cy - 76 * ease, 11, 4);
+
+      for (const n of nodes) {
+        const a = n.act, bw = 46, bh = 46;
+        const hov = S.hoverId === a.id;
+        S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: 28 });
+
+        c.save();
+        c.translate(Math.round(n.x), Math.round(n.y));
+        const isSell = a.kind === 'sell';
+        const bd = a.locked ? '#323946' : (a.armed ? (isSell ? '#e5553c' : '#4ade80') : (hov ? '#e8b04a' : '#5d4c35'));
+        // Cornice pixel a scalino
+        c.fillStyle = bd;
+        c.fillRect(-bw / 2 + 3, -bh / 2, bw - 6, bh);
+        c.fillRect(-bw / 2, -bh / 2 + 3, bw, bh - 6);
+        c.fillStyle = a.locked ? 'rgba(9,11,17,0.72)' : (a.armed ? (isSell ? 'rgba(56,16,20,0.96)' : 'rgba(14,40,26,0.96)') : (hov ? 'rgba(26,31,45,0.96)' : 'rgba(9,11,17,0.90)'));
+        c.fillRect(-bw / 2 + 3, -bh / 2 + 3, bw - 6, bh - 6);
+
+        drawIcon(c, a.icon, 0, -5, 24, a.locked || !a.enabled || a.armed);
+        if (a.locked) drawLockOverlay(c, 0, -4, 18);
+        else if (a.armed) drawConfirmOverlay(c, 0, -5, 22, isSell);
+
+        c.font = '800 10px monospace'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#e5553c' : (isSell ? '#e8b04a' : '#efe4cd')));
+        c.fillText(a.locked ? 'X' : (a.armed ? 'OK' : String(a.cost)), 0, 15);
+        c.restore();
+      }
+      drawInfoHeader(c, cx, cy - 92);
+    }
+
+    // -----------------------------------------------------------------------
+    // STILE 5: DOPPIO ANELLO (Slot DNA interni + Fiale esterne + Preview)
+    // -----------------------------------------------------------------------
+    else if (S.style === 5) {
+      const Rin = 56, Rout = 108;
+      // Anello interno con i 4 slot DNA posizionati attorno al gatto
+      c.save();
+      c.beginPath(); c.arc(cx, cy, Rin * ease, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(148, 163, 184, 0.35)'; c.lineWidth = 2; c.stroke();
+      c.beginPath(); c.arc(cx, cy, Rout * ease, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(245, 158, 11, 0.25)'; c.lineWidth = 1.5; c.stroke();
+      c.restore();
+
+      if (S.hasTower) {
+        const slotAngs = [-Math.PI * 0.75, -Math.PI * 0.25, Math.PI * 0.25, Math.PI * 0.75];
+        for (let i = 0; i < 4; i++) {
+          const sx = cx + Math.cos(slotAngs[i]) * Rin * ease;
+          const sy = cy + Math.sin(slotAngs[i]) * Rin * ease;
+          const id = S.dna[i];
+          const el = id ? ELEMENTS.find(e => e.id === id) : null;
+          c.beginPath(); c.arc(sx, sy, 9, 0, Math.PI * 2);
+          c.fillStyle = el ? el.col : '#0f172a'; c.fill();
+          c.lineWidth = 2; c.strokeStyle = el ? '#fff' : '#475569'; c.stroke();
+          if (el) drawIcon(c, el.icon, sx, sy, 12, false);
+        }
+      }
+
+      const angles = [-Math.PI * 0.78, -Math.PI * 0.22, Math.PI * 0.14, Math.PI * 0.86, Math.PI * 0.5];
+      const nodes = placeCircle(Rout, angles);
+
+      for (const n of nodes) {
+        const a = n.act, rad = 29;
+        const hov = S.hoverId === a.id;
+        S.btns.push({ id: a.id, act: a, x: n.x, y: n.y, r: rad + 3 });
+
+        c.save();
+        c.translate(n.x, n.y);
+        const isSell = a.kind === 'sell';
+        if ((hov || a.armed) && !a.locked) c.scale(1.1, 1.1);
+        c.beginPath(); c.arc(0, 0, rad, 0, Math.PI * 2);
+        c.fillStyle = a.locked ? 'rgba(15,20,32,0.75)' : (a.armed ? (isSell ? '#3b151a' : '#132e22') : (hov ? '#1e2c42' : '#111927'));
+        c.fill();
+        c.lineWidth = (hov || a.armed) ? 3 : 2;
+        c.strokeStyle = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : (a.reason === 'dna' ? '#ef4444' : a.col));
+        c.stroke();
+
+        drawIcon(c, a.icon, 0, -5, 26, a.locked || !a.enabled || a.armed);
+        if (a.locked) drawLockOverlay(c, 0, -5, 22);
+        else if (a.armed) drawConfirmOverlay(c, 0, -5, 26, isSell);
+
+        // Mini-pillola costo
+        c.fillStyle = a.armed ? (isSell ? '#7f1d1d' : '#14532d') : '#090d16';
+        roundRect(c, -23, 13, 46, 16, 8); c.fill();
+        c.strokeStyle = a.locked ? '#334155' : (a.armed ? (isSell ? '#ef4444' : '#4ade80') : a.col); c.lineWidth = 1.2; c.stroke();
+        c.font = '800 10px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillStyle = a.locked ? '#64748b' : (a.armed ? '#ffffff' : (a.reason === 'dna' ? '#f87171' : '#f8fafc'));
+        c.fillText(a.locked ? 'LOCK' : (a.armed ? '✓ ' + a.cost : String(a.cost)), 0, 21);
+        c.restore();
+      }
+      drawInfoHeader(c, cx, cy - Rout - 36);
+    }
+  }
+
+  // --- HIT TEST & INTERAZIONE ---
+  function hitBtn(mx, my) {
+    for (const b of S.btns) {
+      if (b.rect) {
+        if (Math.abs(mx - b.x) <= b.w / 2 && Math.abs(my - b.y) <= b.h / 2) return b;
+      } else {
+        if (Math.hypot(mx - b.x, my - b.y) <= b.r) return b;
+      }
+    }
+    return null;
+  }
+
+  uiCv.addEventListener('pointermove', e => {
+    const r = uiCv.getBoundingClientRect();
+    S.mouseX = e.clientX - r.left;
+    S.mouseY = e.clientY - r.top;
+    const h = hitBtn(S.mouseX, S.mouseY);
+    S.hoverId = h ? h.id : null;
+    uiCv.style.cursor = h ? (h.act.locked ? 'not-allowed' : 'pointer') : 'default';
+  });
+
+  uiCv.addEventListener('pointerdown', e => {
+    const r = uiCv.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const h = hitBtn(mx, my);
+    if (!h) {
+      if (S.armedId) { S.armedId = null; drawBackdrop(); syncHUDInfo(); }
+      return;
+    }
+    const a = h.act;
+    if (a.locked) {
+      S.armedId = null;
+      toast(a.reason === 'max' ? 'Tutti i 4 slot DNA sono già pieni!' : 'Bloccato: max 2 elementi diversi per torre!');
+      drawBackdrop(); syncHUDInfo();
+      return;
+    }
+    if (a.kind !== 'sell' && S.dnaGold < a.cost) {
+      S.armedId = null;
+      toast('DNA insufficiente (' + a.cost + ' richiesti)!');
+      drawBackdrop(); syncHUDInfo();
+      return;
+    }
+    // 1° TAP: arma l'icona e mostra il segno di spunta ✓ in sovrapposizione + anteprima raggio
+    if (S.armedId !== a.id) {
+      S.armedId = a.id;
+      if (a.kind === 'build') toast('Riclicca per confermare Gatto Base (' + a.cost + ' DNA)');
+      else if (a.kind === 'elem') toast('Riclicca per confermare ' + a.label + ' → ' + a.nextProf.name);
+      else toast('Riclicca per confermare la vendita (' + a.cost + ' DNA)');
+      drawBackdrop(); syncHUDInfo();
+      return;
+    }
+    // 2° TAP SULLA STESSA ICONA: conferma ed esegue!
+    S.armedId = null;
+    if (a.kind === 'build') {
+      S.dnaGold -= a.cost; S.hasTower = true; S.dna = []; S.openAnim = 0.15;
+      toast('✓ Gatto Base piazzato!');
+    } else if (a.kind === 'elem') {
+      S.dnaGold -= a.cost; S.dna.push(a.elemId);
+      const pr = catProfile(S.dna);
+      toast('✓ Mutato → ' + pr.name + ' (' + S.dna.length + '/4 DNA)');
+    } else if (a.kind === 'sell') {
+      const ref = Math.floor(spentDNA() * 0.5);
+      S.dnaGold += ref; S.hasTower = false; S.dna = []; S.openAnim = 0.15;
+      toast('✓ Torre venduta (+' + ref + ' DNA)');
+    }
+    drawBackdrop(); syncHUDInfo();
+  });
+
+  // --- CONTROLLI TOPBAR ---
+  document.querySelectorAll('#styleGrp button').forEach(btn => {
+    btn.onclick = () => {
+      S.style = +btn.dataset.style; S.openAnim = 0.1; S.armedId = null;
+      document.querySelectorAll('#styleGrp button').forEach(b => b.classList.toggle('active', b === btn));
+      syncHUDInfo();
+    };
+  });
+  document.querySelectorAll('#textGrp button').forEach(btn => {
+    btn.onclick = () => {
+      S.textLevel = +btn.dataset.text;
+      document.querySelectorAll('#textGrp button').forEach(b => b.classList.toggle('active', b === btn));
+    };
+  });
+  document.querySelectorAll('#presetGrp button').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.preset;
+      S.armedId = null; S.openAnim = 0.15;
+      if (p === 'empty') { S.hasTower = false; S.dna = []; }
+      else if (p === 'base') { S.hasTower = true; S.dna = []; }
+      else if (p === 'one')  { S.hasTower = true; S.dna = ['fire']; }
+      else if (p === 'two')  { S.hasTower = true; S.dna = ['fire', 'elec']; }
+      else if (p === 'max')  { S.hasTower = true; S.dna = ['fire', 'fire', 'elec', 'elec']; }
+      document.querySelectorAll('#presetGrp button').forEach(b => b.classList.toggle('active', b === btn));
+      drawBackdrop(); syncHUDInfo();
+    };
+  });
+  document.getElementById('btnDnaToggle').onclick = () => {
+    S.dnaGold = S.dnaGold >= 180 ? 35 : (S.dnaGold === 35 ? 90 : 300);
+    syncHUDInfo();
+  };
+
+  window.addEventListener('resize', resize);
+  resize();
+  syncHUDInfo();
+
+  let lastT = performance.now();
+  function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    S.t += dt;
+    S.openAnim = Math.min(1, S.openAnim + dt * 4.5);
+
+    ctx.save();
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawCenterPad(ctx);
+    drawRadialMenu(ctx);
+    ctx.restore();
+  }
+  loop(lastT);
+  </script>
+</body>
+</html>
