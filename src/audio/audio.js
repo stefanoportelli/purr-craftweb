@@ -10,6 +10,7 @@ const AU = (function () {
     wind: 0.00,
     sfx: 1.00,
     claw: 0.85,
+    meow: 1.00,
     fire: 0.85,
     volcano: 0.58,
     laser: 0.82,
@@ -218,13 +219,46 @@ const AU = (function () {
   };
 
   S.catMeow = (d, t, p) => {
-    const base = (510 + (p || 0.5) * 210) * rr(0.94, 1.06);
-    const g = gn(d), f = flt(g, 'bandpass', 1350, 3.0);
-    const o = osc('sawtooth', base * 0.85, t, 0.27, f);
-    o.frequency.setValueAtTime(base * 0.85, t);
-    o.frequency.exponentialRampToValueAtTime(base * 1.28, t + 0.08);
-    o.frequency.exponentialRampToValueAtTime(base * 0.72, t + 0.25);
-    ad(g.gain, t, 0.26, 0.025, 0.24);
+    const pv = p === undefined ? 0.5 : p;
+    const base = (440 + pv * 380) * rr(0.96, 1.04); // Da gatto adulto a gattino acuto
+    const dur = rr(0.32, 0.46);
+
+    // Inviluppo vocale con sustain (evita il decadimento percussivo istantaneo di ad())
+    const env = gn(d, 0);
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(0.68, t + dur * 0.14);
+    env.gain.linearRampToValueAtTime(0.82, t + dur * 0.42);
+    env.gain.linearRampToValueAtTime(0.55, t + dur * 0.72);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    // Due formanti vocali parallele ("mi-AA-oo")
+    const f1 = flt(gn(env, 0.95), 'bandpass', 950, 2.4);
+    f1.frequency.setValueAtTime(820, t);
+    f1.frequency.exponentialRampToValueAtTime(1650, t + dur * 0.36);
+    f1.frequency.exponentialRampToValueAtTime(720, t + dur);
+
+    const f2 = flt(gn(env, 0.55), 'bandpass', 2100, 3.2);
+    f2.frequency.setValueAtTime(1700, t);
+    f2.frequency.exponentialRampToValueAtTime(2850, t + dur * 0.34);
+    f2.frequency.exponentialRampToValueAtTime(1350, t + dur);
+
+    // Oscillatore principale (sawtooth ricca di armoniche) + corpo triangle
+    const o1 = osc('sawtooth', base * 0.86, t, dur + 0.05, f1);
+    o1.connect(f2);
+    o1.frequency.setValueAtTime(base * 0.86, t);
+    o1.frequency.exponentialRampToValueAtTime(base * 1.36, t + dur * 0.32);
+    o1.frequency.exponentialRampToValueAtTime(base * 0.78, t + dur);
+
+    const o2 = osc('triangle', base * 0.86, t, dur + 0.04, gn(env, 0.32));
+    o2.frequency.setValueAtTime(base * 0.86, t);
+    o2.frequency.exponentialRampToValueAtTime(base * 1.36, t + dur * 0.32);
+    o2.frequency.exponentialRampToValueAtTime(base * 0.78, t + dur);
+
+    // Leggero vibrato felino
+    const vib = gn(null, 18);
+    osc('sine', rr(5.5, 7.2), t, dur + 0.04, vib);
+    vib.connect(o1.detune);
+    vib.connect(o2.detune);
   };
 
   S.catFire = (d, t, p) => {
@@ -535,7 +569,7 @@ const AU = (function () {
     catPyro:   [S.catPyro,   0.05,  0.26, 2, 0.30, 0.80, 'hybrid'],
     catMut:    [S.catMut,    0.06,  0.30, 2, 0.45, 0.85, 'mut'],
     laserClick:[S.laserClick,0.05,  0.14, 2, 0.12, 0.72, 'laser'],
-    catMeow:   [S.catMeow,   0.06,  0.24, 2, 0.30, 0.74, 'claw'],
+    catMeow:   [S.catMeow,   0.07,  0.24, 3, 0.48, 1.15, 'meow'],
 
     bow: [S.bow, 0.05, 0.18, 1, 0.3, 0.55],
     arrowHit: [S.arrowHit, 0.045, 0.12, 0, 0.15, 0.5],
@@ -860,6 +894,7 @@ const AU = (function () {
     const rowsCat = [
       ['sfx',     'SFX Globali', 150],
       ['claw',    'Gatto Base (Graffio)', 150],
+      ['meow',    'Miagolii (Carica Felina)', 150],
       ['fire',    'Gatto Fuoco (Lv 1-3)', 150],
       ['volcano', 'Vulcano Lv 4 (Raffica)', 150],
       ['laser',   'Gatto Laser (Lv 1-4)', 150],
@@ -897,6 +932,7 @@ const AU = (function () {
           <button data-aut="l1">Laser Lv1</button>
           <button data-aut="l4">Cyborg Lv4</button>
           <button data-aut="pl">Plasma 2x2</button>
+          <button data-aut="meow">Miagolio</button>
         </div>
         <div class="fbar">
           <button id="au-copy">Copia Config</button>
@@ -958,6 +994,7 @@ const AU = (function () {
         else if (act === 'l1') play('catLaser', 0, 0.78, 0);
         else if (act === 'l4') play('catLaser', 0, 0.78, 1);
         else if (act === 'pl') play('catPlasma', 0, 0.85, 0.5);
+        else if (act === 'meow') play('catMeow', 0, 1.0, rnd());
       };
     });
 

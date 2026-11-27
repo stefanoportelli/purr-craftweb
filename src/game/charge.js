@@ -25,6 +25,7 @@ const CHARGE = (() => {
     cd: 0,
     cats: [],
     meowQueue: [],
+    meowCd: 0,
     ringPh: 0,
   };
 
@@ -160,7 +161,8 @@ const CHARGE = (() => {
         atkCd: 0,
       });
     }
-    S.meowQueue = [0.02, 0.14, 0.28];
+    S.meowQueue = [0.02, 0.18, 0.36];
+    S.meowCd = 0.42;
     return true;
   }
 
@@ -171,6 +173,7 @@ const CHARGE = (() => {
     S.hasPreview = false;
     S.cats.length = 0;
     S.meowQueue.length = 0;
+    S.meowCd = 0;
   }
 
   function drawLaserFX(x, z, rad, alpha) {
@@ -206,8 +209,28 @@ const CHARGE = (() => {
         S.meowQueue[i] -= dt;
         if (S.meowQueue[i] <= 0) {
           S.meowQueue.splice(i, 1);
-          sfx('catMeow', S.x, S.z, 0.82, rnd());
+          sfx('catMeow', S.x, S.z, 1.0, rnd());
         }
+      }
+    }
+    if (S.state === 'active' && S.cats.length) {
+      S.meowCd -= dt;
+      if (S.meowCd <= 0) {
+        // Sceglie un gatto casuale vicino al puntino (o il piu vicino se stai trascinando veloce)
+        let pick = null, bestD = 1e9;
+        const near = [];
+        const nearR = C.rad + 5.5;
+        for (let i = 0; i < S.cats.length; i++) {
+          const c = S.cats[i];
+          if (c.leaving) continue;
+          const d = Math.hypot(c.x - S.x, c.z - S.z);
+          if (d <= nearR) near.push(c);
+          if (d < bestD) { bestD = d; pick = c; }
+        }
+        const src = near.length ? near[(rnd() * near.length) | 0] : pick;
+        const mx = src ? src.x : S.x, mz = src ? src.z : S.z;
+        sfx('catMeow', mx, mz, rr(0.95, 1.25), rnd());
+        S.meowCd = rr(0.18, 0.36);
       }
     }
 
