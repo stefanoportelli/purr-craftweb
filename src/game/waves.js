@@ -112,8 +112,8 @@ function buildWave(k, level) {
   } else {
     q.push({ t: 2.0, type: 'amalgama', hpMul: wMul * (1 + .38 * level) * ((C && !C.useDynamicPress) ? 1 : Math.pow(G.press, .4)) });
     t = 4.5;
-    addGroup('polipetto', Math.round((C ? C.w5Poli : 16) * mult), .26);
-    addGroup('tentacolo', Math.round((C ? C.w5Tent : 10) * mult), .4);
+    addGroup('polipetto', Math.round((C ? C.w5Poli : 20) * mult), .26);
+    addGroup('tentacolo', Math.round((C ? C.w5Tent : 12) * mult), .4);
   }
   q.sort((a, b) => a.t - b.t);
   return q;
@@ -138,7 +138,7 @@ function endWave() {
 function updateWaves(dt) {
   if (G.phase !== 'play') return;
   const C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
-  const regen = C ? C.dnaPerSec : 2.0;
+  const regen = C ? C.dnaPerSec : 1.3;
   if (regen > 0) {
     G.dnaAcc = (G.dnaAcc || 0) + dt * regen;
     if (G.dnaAcc >= 1) { const add = Math.floor(G.dnaAcc); G.dnaAcc -= add; G.gold += add; }
@@ -240,7 +240,7 @@ function setPhase(p) {
   if (p === 'clear') {
     G.advance = true;
     const sm = recordRunSummary(true);
-    UI.banner('Livello ' + sm.level + ' Completato · ' + '★'.repeat(sm.stars) + '☆'.repeat(3 - sm.stars), 3.0, false);
+    UI.banner('Livello ' + sm.level + ' Completato · ' + sm.stars + '/3 Zampe', 3.0, false);
     UI.closeMenu();
   }
   if (p === 'defeat') {
@@ -259,6 +259,7 @@ function startCrumble() {
   for (const m of G.mons) if (!m.dead) { shatter(e => rigMonster(e), m, [0, 1, 0], { spread: 1.2, life: 1 }); removeMonster(m); }
   for (const f of G.men) if (!f.dead) { f.weapon = KIT.item.blade; shatter(e => rigHuman(KIT.foot, SPEC.foot, e), f, [0, 1, 0], { spread: 1, life: 1 }); f.dead = f.gone = true; f.alive = false; if (f.flame) removeFlame(f.flame); }
   G.mons.length = 0; G.men.length = 0; G.arrows.length = 0; G.shells.length = 0; G.stuck.length = 0; G.beams.length = 0;
+  if (typeof CHARGE !== 'undefined' && CHARGE.reset) CHARGE.reset();
   for (const t of G.towers) {
     t.em.alive = false; LT.emitters[t.idx] = null; removeFlame(t.flame); removeFlame(t.flame2); t.flame = t.flame2 = null; t.archers.length = 0; t.alive = false; t.state = 'gone';
     if (t.monocle) t.monocle.visible = false;
@@ -292,6 +293,7 @@ function activateBoard(B, lit) {
 }
 function beginBattle(first) {
   G.summary = null;
+  if (typeof CHARGE !== 'undefined' && CHARGE.reset) CHARGE.reset();
   const B = G.B, C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
   if (typeof BAL !== 'undefined') BAL.sync(false);
   G.maxLives = C ? Math.max(1, Math.round(C.baseHp)) : 100;

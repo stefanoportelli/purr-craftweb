@@ -4,7 +4,7 @@ const BAL = (function () {
   const DEFAULTS = {
     // Economia & Base (Calibrati Monte Carlo su Livello 1)
     startDna: 100,
-    dnaPerSec: 2.0,
+    dnaPerSec: 1.3,
     baseHp: 100,
     sellRefund: 0.50,
     waveClearBonus: 0,
@@ -25,13 +25,13 @@ const BAL = (function () {
     baseRange: 4.4,
 
     // Gatto Fuoco Lv 1..4 (Terra + Splash)
-    fireDmg1: 30,  fireDmg2: 65,  fireDmg3: 120, fireDmg4: 220,
+    fireDmg1: 26,  fireDmg2: 55,  fireDmg3: 100, fireDmg4: 185,
     fireRate1: 0.67, fireRate2: 0.50, fireRate3: 0.40, fireRate4: 0.286,
     fireRange1: 5.2, fireRange2: 5.8, fireRange3: 6.4, fireRange4: 7.2,
     fireSplash1: 1.0, fireSplash2: 1.2, fireSplash3: 1.5, fireSplash4: 2.0,
 
     // Gatto Elettrico / Laser Lv 1..4 (Solo Aria)
-    elecDmg1: 35,  elecDmg2: 80,  elecDmg3: 150, elecDmg4: 260,
+    elecDmg1: 30,  elecDmg2: 68,  elecDmg3: 125, elecDmg4: 220,
     elecRate1: 0.67, elecRate2: 0.50, elecRate3: 0.40, elecRate4: 0.286,
     elecRange1: 5.8, elecRange2: 6.5, elecRange3: 7.3, elecRange4: 8.5,
 
@@ -41,23 +41,30 @@ const BAL = (function () {
     pyroDmg: 175,   pyroRate: 0.38,   pyroRange: 7.5,
 
     // Bestiario Cap. 1 (Calibrati per curva stelle 1-3 su Livello 1)
-    poliHp: 50,   poliSpd: 1.90, poliBounty: 4,   poliLeak: 5,
-    abomHp: 350,  abomSpd: 0.85, abomBounty: 20,  abomLeak: 15, abomArmor: 0.60,
-    tentHp: 120,  tentSpd: 1.65, tentBounty: 10,  tentLeak: 10,
-    amalHp: 3000, amalSpd: 0.62, amalBounty: 150, amalLeak: 100,
+    poliHp: 85,   poliSpd: 1.90, poliBounty: 3,   poliLeak: 5,
+    abomHp: 620,  abomSpd: 0.85, abomBounty: 16,  abomLeak: 15, abomArmor: 0.60,
+    tentHp: 210,  tentSpd: 1.65, tentBounty: 8,   tentLeak: 10,
+    amalHp: 6500, amalSpd: 0.62, amalBounty: 150, amalLeak: 100,
 
     // Composizione Ondate Livello 1 (Wave 1..5)
     w1Poli: 20,
     w2Poli: 22, w2Abom: 3,
     w3Poli: 18, w3Tent: 14,
     w4Poli: 28, w4Abom: 4, w4Tent: 12,
-    w5Poli: 16, w5Tent: 10,
+    w5Poli: 20, w5Tent: 12,
+
+    // Carica Felina (Puntatore Laser - Segui Cursore)
+    chargeCount: 16,
+    chargeDur: 4.5,
+    chargeDmg: 35,
+    chargeRad: 2.8,
+    chargeCd: 18.0,
 
     // Moltiplicatore globale HP ondate (1.00 = valori puri da tabella)
     waveHpMul: 1.00,
   };
 
-  const STORAGE_KEY = 'purrcraft.balanceCfg';
+  const STORAGE_KEY = 'purrcraft.balanceCfg.v2';
   const cfg = Object.assign({}, DEFAULTS);
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
@@ -158,6 +165,7 @@ const BAL = (function () {
     G.towers.length = 0;
     if (typeof clearDebris === 'function') clearDebris();
     if (typeof clearFX === 'function') clearFX();
+    if (typeof CHARGE !== 'undefined' && CHARGE.reset) CHARGE.reset();
     G.paused = true;
     sync(false);
     if (typeof beginBattle === 'function') beginBattle(true);
@@ -568,7 +576,7 @@ const BAL = (function () {
     box.innerHTML = `
       <div class="mc-meta">Mappa attiva: <b>${res.padCount} piazzole</b> · Strada <b>${res.roadLen}u</b> · <b>${res.totalRuns} run</b> in <b>${res.ms} ms</b></div>
       <table class="mc-tbl">
-        <thead><tr><th>Profilo</th><th>Win</th><th>3★</th><th>2★+</th><th>KO Wave</th></tr></thead>
+        <thead><tr><th>Profilo</th><th>Win</th><th>3🐾</th><th>2🐾+</th><th>KO Wave</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -758,6 +766,12 @@ const BAL = (function () {
           ${sl('elecDmg3', 'Danno Laser Lv 3', 50, 300, 5)}
           ${sl('elecDmg4', 'Danno Cyborg Lv 4', 100, 500, 10)}
           ${sl('plasmaDmg', 'Danno Gatto Plasma (2F+2E)', 150, 900, 10)}
+          <div class="sec">Carica Felina (Laser [Q])</div>
+          ${sl('chargeCount', 'Gatti nell\'Orda', 6, 32, 2)}
+          ${sl('chargeDur', 'Durata Laser (s)', 2, 8, 0.5)}
+          ${sl('chargeDmg', 'Danno Impatto Gatto', 10, 90, 5)}
+          ${sl('chargeRad', 'Raggio Frenesia', 1.4, 4.5, 0.2)}
+          ${sl('chargeCd', 'Cooldown (s)', 5, 40, 1)}
         </div>
 
         <div class="pane" id="bpane-mons">
@@ -767,14 +781,14 @@ const BAL = (function () {
           ${sl('poliSpd', 'Velocità Polipetto', 0.8, 3.5, 0.05)}
           ${sl('poliBounty', 'DNA Drop Polipetto', 1, 20, 1)}
           <div class="sec">Abominio di Roccia (Tank)</div>
-          ${sl('abomHp', 'HP Abominio', 80, 900, 10)}
+          ${sl('abomHp', 'HP Abominio', 100, 1200, 10)}
           ${sl('abomSpd', 'Velocità Abominio', 0.4, 2.0, 0.05)}
           ${sl('abomBounty', 'DNA Drop Abominio', 5, 60, 1)}
           <div class="sec">Tentacolo Alato (Aria) &amp; Boss</div>
           ${sl('tentHp', 'HP Tentacolo', 30, 350, 5)}
           ${sl('tentSpd', 'Velocità Tentacolo', 0.8, 3.0, 0.05)}
           ${sl('tentBounty', 'DNA Drop Tentacolo', 3, 40, 1)}
-          ${sl('amalHp', 'HP Boss Amalgama', 500, 6000, 100)}
+          ${sl('amalHp', 'HP Boss Amalgama', 1000, 10000, 100)}
         </div>
 
         <div class="fbar">

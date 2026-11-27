@@ -85,6 +85,7 @@ function step(rdt) {
     updateUnits(dt);
     for (let i = G.mons.length - 1; i >= 0; i--) if (G.mons[i].dead) swapRemove(G.mons, i);
     updateProjectiles(dt);
+    if (typeof CHARGE !== 'undefined') CHARGE.update(dt);
     for (const m of G.mons) drawMonster(m, G.t);
     for (const f of G.men) if (!f.dead) drawFootman(f);
     if (G.phase === 'play') {
@@ -132,6 +133,7 @@ function stepPaused(rdt) {
   if (live) {
     for (const t of G.towers) if (t.alive) t.updatePaused(rdt);
     updateProjectiles(0);
+    if (typeof CHARGE !== 'undefined') CHARGE.drawPaused(rdt);
     for (const m of G.mons) if (!m.dead) drawMonster(m, G.t);
     for (const f of G.men) if (!f.dead) drawFootman(f);
     if (G.phase === 'play') {
@@ -193,7 +195,7 @@ function boot() {
   try { if (localStorage.getItem('purrcraft.perf') === '1') wantPerf = true; } catch (e) {}
   initRenderer(); initMaterials(); initLights();
   if (wantPerf && typeof setPerfMode === 'function') setPerfMode(true, true); else resizeRenderer();
-  initFX(); initWeather(); initKits(); UI.init();
+  initFX(); initWeather(); initKits(); if (typeof CHARGE !== 'undefined') CHARGE.init(); UI.init();
   KIT.marker = new PartBatch(S => {
     const gold = mulC(COL.gold, .85), amber = C(0xc9682a);
     S.box(.08, 1.15, .08, 0, .57, 0, COL.woodD, { l: L_WOOD, r: [0, 0, .05] }); S.cone(.07, .14, .03, 1.2, 0, COL.brass, { n: 4, l: L_METAL, emis: .05 });

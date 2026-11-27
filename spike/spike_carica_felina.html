@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purr-craft — Spike: La Carica Felina (Puntatore Laser)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0a0f18; color: #e6edf3; overflow: hidden; user-select: none; }
+    canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+    #ui {
+      position: fixed; top: 14px; left: 14px; width: 310px;
+      background: rgba(12, 18, 30, 0.92); border: 1px solid #2b3f5e;
+      border-radius: 12px; padding: 14px 15px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+    }
+    h1 { font-size: 15px; color: #ffd97d; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+    .sub { font-size: 11.5px; color: #94a3b8; line-height: 1.4; margin-bottom: 10px; }
+
+    .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .mode-btn {
+      background: #172233; border: 1px solid #2e4361; border-radius: 7px;
+      padding: 7px 6px; color: #cbd5e1; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    }
+    .mode-btn.active { background: #3b1420; border-color: #ff3b5c; color: #ffd6de; box-shadow: 0 0 10px rgba(255,59,92,0.28); }
+
+    .sl-row { margin-bottom: 8px; }
+    .sl-row label { display: flex; justify-content: space-between; font-size: 11.5px; color: #94a3b8; margin-bottom: 2px; }
+    .sl-row label b { color: #f8fafc; }
+    input[type="range"] { width: 100%; accent-color: #ff3b5c; cursor: pointer; }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+    button.act {
+      background: #1e293b; color: #e2e8f0; border: 1px solid #475569;
+      border-radius: 7px; padding: 7px 8px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    }
+    button.act:hover { background: #334155; border-color: #94a3b8; }
+
+    .stats {
+      margin-top: 10px; padding-top: 8px; border-top: 1px solid #1e2d42;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; font-size: 11px; color: #94a3b8;
+    }
+    .stats b { color: #fbbf24; }
+
+    /* Pulsante HUD Carica Felina in basso al centro */
+    #hud-bar {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+    }
+    #btnLaser {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, #991b1b, #ef4444);
+      color: #fff; border: 2px solid #fca5a5; border-radius: 12px;
+      padding: 12px 22px; font-size: 14px; font-weight: 800; letter-spacing: 0.4px;
+      cursor: pointer; box-shadow: 0 6px 24px rgba(239, 68, 68, 0.45);
+      transition: transform 0.1s, filter 0.15s;
+    }
+    #btnLaser:hover { filter: brightness(1.1); }
+    #btnLaser:active { transform: scale(0.97); }
+    #btnLaser.armed {
+      background: linear-gradient(135deg, #be123c, #ff2e55);
+      border-color: #fff; box-shadow: 0 0 28px rgba(255, 46, 85, 0.85);
+      animation: pulse 0.9s infinite alternate;
+    }
+    #btnLaser.cooling {
+      background: #1e293b; border-color: #475569; color: #94a3b8; box-shadow: none; cursor: not-allowed;
+    }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.04); } }
+    #cdFill {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+      background: rgba(255, 59, 92, 0.25); pointer-events: none;
+    }
+    .hint {
+      position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
+      background: rgba(10, 15, 24, 0.85); border: 1px solid #334155; border-radius: 999px;
+      padding: 5px 14px; font-size: 12px; color: #fda4af; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .hint.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1>🔴 Spike: La Carica Felina</h1>
+    <div class="sub">Attiva il <b>Puntatore Laser [Q]</b> e clicca sulla strada: un'orda di gatti arriva dai bordi dello schermo a caccia del puntino rosso, travolgendo i mostri!</div>
+
+    <div class="mode-row">
+      <button class="mode-btn active" id="mFixed">Punto Fisso (Click)</button>
+      <button class="mode-btn" id="mFollow">Segui Cursore</button>
+    </div>
+
+    <div class="sl-row">
+      <label>Gatti nell'Orda <b id="vCount">16</b></label>
+      <input id="slCount" type="range" min="6" max="32" step="2" value="16" />
+    </div>
+    <div class="sl-row">
+      <label>Durata Puntino Rosso <b id="vDur">4.5s</b></label>
+      <input id="slDur" type="range" min="2" max="8" step="0.5" value="4.5" />
+    </div>
+    <div class="sl-row">
+      <label>Danno per Impatto <b id="vDmg">35</b></label>
+      <input id="slDmg" type="range" min="10" max="90" step="5" value="35" />
+    </div>
+    <div class="sl-row">
+      <label>Raggio Frenesia <b id="vRad">2.8u</b></label>
+      <input id="slRad" type="range" min="1.4" max="4.5" step="0.2" value="2.8" />
+    </div>
+
+    <div class="btn-row">
+      <button class="act" id="btnWave">+ Sciame Mostri</button>
+      <button class="act" id="btnResetCd">Reset Cooldown</button>
+    </div>
+
+    <div class="stats">
+      <span>Mostri vivi: <b id="stMons">0</b></span>
+      <span>Abbattuti: <b id="stKills">0</b></span>
+      <span>Gatti in corsa: <b id="stCats">0</b></span>
+      <span>Stato: <b id="stState">Pronto</b></span>
+    </div>
+  </div>
+
+  <div id="hint" class="hint">Clicca sulla strada per puntare il laser rosso!</div>
+  <div id="hud-bar">
+    <button id="btnLaser"><span id="cdFill"></span><span id="btnLbl">🔴 CARICA FELINA [Q]</span></button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
+  <script>
+  'use strict';
+
+  // --- AUDIO PROCEDURALE LEGGERO (Web Audio API) ---
+  const SFX = (() => {
+    let ctx = null;
+    function init() {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+    }
+    function laserClick() {
+      init();
+      const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(1400, t); o.frequency.exponentialRampToValueAtTime(2600, t + 0.06);
+      g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.1);
+    }
+    function meow(pitchMul = 1) {
+      init();
+      const t = ctx.currentTime, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth';
+      const base = (520 + Math.random() * 180) * pitchMul;
+      o.frequency.setValueAtTime(base * 0.85, t);
+      o.frequency.exponentialRampToValueAtTime(base * 1.28, t + 0.08);
+      o.frequency.exponentialRampToValueAtTime(base * 0.72, t + 0.24);
+      f.type = 'bandpass'; f.frequency.setValueAtTime(1350, t); f.Q.value = 3.2;
+      g.gain.setValueAtTime(0.001, t); g.gain.linearRampToValueAtTime(0.065, t + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+      o.connect(f); f.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.28);
+    }
+    function hit() {
+      init();
+      const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(320 + Math.random() * 120, t); o.frequency.exponentialRampToValueAtTime(95, t + 0.07);
+      g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.09);
+    }
+    return { laserClick, meow, hit };
+  })();
+
+  // --- PARAMETRI SPIKE ---
+  const CFG = { mode: 'fixed', count: 16, dur: 4.5, dmg: 35, rad: 2.8, cooldown: 10.0 };
+
+  // --- SCENA 3D ISOMETRICA ---
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b121e);
+
+  const viewH = 26;
+  const aspect = window.innerWidth / window.innerHeight;
+  const cam = new THREE.OrthographicCamera(-viewH * aspect / 2, viewH * aspect / 2, viewH / 2, -viewH / 2, 1, 140);
+  cam.position.set(32, 34, 32);
+  cam.lookAt(0, 0, 0);
+
+  scene.add(new THREE.HemisphereLight(0x8bb8e8, 0x1a2634, 0.85));
+  const sun = new THREE.DirectionalLight(0xfff1d6, 1.35);
+  sun.position.set(18, 32, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -22; sun.shadow.camera.right = 22;
+  sun.shadow.camera.top = 22; sun.shadow.camera.bottom = -22;
+  scene.add(sun);
+
+  // Terreno Laboratorio
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(34, 1.2, 34),
+    new THREE.MeshStandardMaterial({ color: 0x26323d, roughness: 0.9 })
+  );
+  floor.position.y = -0.6;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const grid = new THREE.GridHelper(34, 17, 0x384b5c, 0x1c2732);
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  // Percorso a S dei mostri
+  const roadPts = [
+    new THREE.Vector3(-15, 0, -10),
+    new THREE.Vector3(-5,  0, -10),
+    new THREE.Vector3(4,   0, -3),
+    new THREE.Vector3(-4,  0,  4),
+    new THREE.Vector3(6,   0,  10),
+    new THREE.Vector3(15,  0,  10),
+  ];
+  const roadCurve = new THREE.CatmullRomCurve3(roadPts);
+  const roadLen = roadCurve.getLength();
+
+  // Strada visiva
+  const roadSample = roadCurve.getPoints(64);
+  for (let i = 0; i < roadSample.length - 1; i++) {
+    const a = roadSample[i], b = roadSample[i + 1];
+    const len = a.distanceTo(b);
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 0.08, len + 0.35),
+      new THREE.MeshStandardMaterial({ color: 0x525e6b, roughness: 0.85 })
+    );
+    seg.position.set((a.x + b.x) / 2, 0.02, (a.z + b.z) / 2);
+    seg.rotation.y = Math.atan2(b.x - a.x, b.z - a.z);
+    seg.receiveShadow = true;
+    scene.add(seg);
+  }
+
+  // --- PUNTINO ROSSO LASER ---
+  const laserGroup = new THREE.Group();
+  laserGroup.visible = false;
+  const laserDot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.28, 14, 14),
+    new THREE.MeshBasicMaterial({ color: 0xff1e3c })
+  );
+  laserDot.position.y = 0.14;
+  laserGroup.add(laserDot);
+
+  const laserRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.4, 0.58, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff3b5c, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+  );
+  laserRing.rotation.x = -Math.PI / 2;
+  laserRing.position.y = 0.08;
+  laserGroup.add(laserRing);
+
+  const areaRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.95, 1.0, 48),
+    new THREE.MeshBasicMaterial({ color: 0xff3b5c, side: THREE.DoubleSide, transparent: true, opacity: 0.35 })
+  );
+  areaRing.rotation.x = -Math.PI / 2;
+  areaRing.position.y = 0.06;
+  laserGroup.add(areaRing);
+
+  const laserLight = new THREE.PointLight(0xff2244, 6, 8);
+  laserLight.position.y = 0.8;
+  laserGroup.add(laserLight);
+  scene.add(laserGroup);
+
+  // --- MODELLO LOW-POLY GATTO CORRIDORE ---
+  const CAT_PALETTES = [0xf59e0b, 0x334155, 0xe2e8f0, 0xd97706, 0x94a3b8, 0x7c2d12];
+  function makeCatMesh(colorHex) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.75 });
+    const earIn = new THREE.MeshStandardMaterial({ color: 0xf9a8d4, roughness: 0.8 });
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.38, 0.78), mat);
+    body.position.y = 0.32; body.castShadow = true; g.add(body);
+
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.40, 0.42), mat);
+    head.position.set(0, 0.56, 0.36); head.castShadow = true; g.add(head);
+
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.22, 4), mat);
+      ear.position.set(s * 0.14, 0.84, 0.38); g.add(ear);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.05), eyeMat);
+      eye.position.set(s * 0.11, 0.58, 0.57); g.add(eye);
+    }
+
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.52), mat);
+    tail.position.set(0, 0.52, -0.48); tail.rotation.x = 0.6; g.add(tail);
+    g.userData.tail = tail;
+    return g;
+  }
+
+  // --- MOSTRI (POLIPETTI & ABOMINI) ---
+  const monsters = [];
+  let kills = 0;
+
+  function spawnMonster(isTank = false, uOffset = 0) {
+    const maxHp = isTank ? 240 : 65;
+    const rad = isTank ? 0.62 : 0.34;
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({
+      color: isTank ? 0x64748b : 0x65a30d,
+      roughness: 0.6,
+      emissive: 0x000000
+    });
+    const mesh = new THREE.Mesh(
+      isTank ? new THREE.DodecahedronGeometry(rad, 0) : new THREE.SphereGeometry(rad, 10, 8),
+      mat
+    );
+    mesh.position.y = rad; mesh.castShadow = true; g.add(mesh);
+
+    // Barra HP
+    const hpBg = new THREE.Mesh(new THREE.PlaneGeometry(rad * 2.2, 0.14), new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.DoubleSide }));
+    hpBg.position.y = rad * 2.45; g.add(hpBg);
+    const hpFg = new THREE.Mesh(new THREE.PlaneGeometry(rad * 2.1, 0.10), new THREE.MeshBasicMaterial({ color: 0x84cc16, side: THREE.DoubleSide }));
+    hpFg.position.set(0, rad * 2.45, 0.01); g.add(hpFg);
+
+    scene.add(g);
+    monsters.push({
+      g, mesh, mat, hpFg, hp: maxHp, maxHp, rad,
+      u: uOffset, spd: isTank ? 0.022 : 0.044,
+      lat: (Math.random() - 0.5) * 1.6,
+      flash: 0, hitCd: 0
+    });
+  }
+
+  function spawnSwarm() {
+    for (let i = 0; i < 10; i++) spawnMonster(false, i * 0.014);
+    spawnMonster(true, 0.03);
+    spawnMonster(true, 0.09);
+  }
+  spawnSwarm();
+
+  // --- PARTICELLE POLVERE / GRAFFI ---
+  const parts = [];
+  const partGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+  function spawnBurst(x, y, z, col, n = 6) {
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 }));
+      m.position.set(x, y, z);
+      scene.add(m);
+      const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 4.5;
+      parts.push({ m, vx: Math.cos(a) * sp, vy: 2.5 + Math.random() * 3.5, vz: Math.sin(a) * sp, life: 0.35 + Math.random() * 0.25, max: 0.6 });
+    }
+  }
+
+  // --- LOGICA CARICA FELINA ---
+  const cats = [];
+  let laserState = 'ready'; // 'ready' | 'armed' | 'active' | 'cooling'
+  let laserTimer = 0;
+  let cdTimer = 0;
+  const laserPos = new THREE.Vector3(0, 0, 0);
+
+  function spawnCatHorde(target) {
+    const n = CFG.count;
+    for (let i = 0; i < n; i++) {
+      const edge = i % 4;
+      let sx = 0, sz = 0;
+      const spread = (Math.random() - 0.5) * 32;
+      if (edge === 0) { sx = -21 - Math.random() * 6; sz = spread; }
+      else if (edge === 1) { sx = 21 + Math.random() * 6; sz = spread; }
+      else if (edge === 2) { sx = spread; sz = -21 - Math.random() * 6; }
+      else { sx = spread; sz = 21 + Math.random() * 6; }
+
+      const mesh = makeCatMesh(CAT_PALETTES[i % CAT_PALETTES.length]);
+      mesh.position.set(sx, 0, sz);
+      scene.add(mesh);
+
+      // Angolo orbitale/frenesia attorno al puntino rosso
+      const orbAng = (i / n) * Math.PI * 2 + Math.random() * 0.5;
+      cats.push({
+        mesh, x: sx, z: sz,
+        vx: 0, vz: 0,
+        spd: 12.5 + Math.random() * 4.5,
+        hopPh: Math.random() * Math.PI * 2,
+        orbAng, orbDir: Math.random() < 0.5 ? 1 : -1,
+        orbRad: 0.35 + Math.random() * (CFG.rad * 0.78),
+        leaving: false,
+        exitX: sx * 1.15, exitZ: sz * 1.15,
+        atkCd: 0
+      });
+    }
+    // 3 miagolii sfalsati all'arrivo dell'orda
+    SFX.meow(1.0);
+    setTimeout(() => SFX.meow(1.18), 110);
+    setTimeout(() => SFX.meow(0.88), 240);
+  }
+
+  function triggerLaserAt(pt) {
+    laserPos.set(THREE.MathUtils.clamp(pt.x, -15, 15), 0, THREE.MathUtils.clamp(pt.z, -15, 15));
+    laserGroup.position.copy(laserPos);
+    laserGroup.visible = true;
+    areaRing.scale.setScalar(CFG.rad);
+    laserState = 'active';
+    laserTimer = CFG.dur;
+    SFX.laserClick();
+    spawnBurst(laserPos.x, 0.3, laserPos.z, 0xff3b5c, 10);
+    spawnCatHorde(laserPos);
+    updateUIState();
+  }
+
+  // --- RAYCAST & INPUT ---
+  const raycaster = new THREE.Raycaster();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const mouseNDC = new THREE.Vector2();
+  const hitPt = new THREE.Vector3();
+
+  function getGroundPoint(clientX, clientY) {
+    mouseNDC.x = (clientX / window.innerWidth) * 2 - 1;
+    mouseNDC.y = -(clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, cam);
+    return raycaster.ray.intersectPlane(groundPlane, hitPt) ? hitPt : null;
+  }
+
+  renderer.domElement.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (laserState === 'armed') {
+      const pt = getGroundPoint(e.clientX, e.clientY);
+      if (pt) triggerLaserAt(pt);
+    } else if (laserState === 'active' && CFG.mode === 'fixed') {
+      // Anche in Punto Fisso puoi riposizionare il puntino con un click mentre è attivo
+      const pt = getGroundPoint(e.clientX, e.clientY);
+      if (pt) {
+        laserPos.set(THREE.MathUtils.clamp(pt.x, -15, 15), 0, THREE.MathUtils.clamp(pt.z, -15, 15));
+        laserGroup.position.copy(laserPos);
+        SFX.laserClick();
+      }
+    }
+  });
+
+  renderer.domElement.addEventListener('pointermove', e => {
+    if (laserState === 'active' && CFG.mode === 'follow') {
+      const pt = getGroundPoint(e.clientX, e.clientY);
+      if (pt) {
+        laserPos.set(THREE.MathUtils.clamp(pt.x, -15, 15), 0, THREE.MathUtils.clamp(pt.z, -15, 15));
+        laserGroup.position.copy(laserPos);
+      }
+    }
+  });
+
+  // --- CONTROLLI UI ---
+  const btnLaser = document.getElementById('btnLaser');
+  const btnLbl = document.getElementById('btnLbl');
+  const cdFill = document.getElementById('cdFill');
+  const hint = document.getElementById('hint');
+
+  function armLaser() {
+    if (laserState === 'ready') {
+      laserState = 'armed';
+      updateUIState();
+    } else if (laserState === 'armed') {
+      laserState = 'ready';
+      updateUIState();
+    }
+  }
+  btnLaser.onclick = armLaser;
+  window.addEventListener('keydown', e => {
+    if (e.code === 'KeyQ') armLaser();
+    if (e.code === 'Escape' && laserState === 'armed') { laserState = 'ready'; updateUIState(); }
+  });
+
+  function updateUIState() {
+    btnLaser.className = laserState === 'armed' ? 'armed' : (laserState === 'cooling' ? 'cooling' : '');
+    hint.classList.toggle('show', laserState === 'armed');
+    if (laserState === 'ready') {
+      btnLbl.textContent = '🔴 CARICA FELINA [Q]';
+      cdFill.style.width = '0%';
+      document.getElementById('stState').textContent = 'Pronto';
+    } else if (laserState === 'armed') {
+      btnLbl.textContent = '🎯 CLICCA SULLA STRADA';
+      document.getElementById('stState').textContent = 'Puntamento...';
+    } else if (laserState === 'active') {
+      btnLbl.textContent = `🐾 CARICA ATTIVA (${laserTimer.toFixed(1)}s)`;
+      document.getElementById('stState').textContent = 'In corso!';
+    } else {
+      btnLbl.textContent = `⏳ RICARICA (${Math.ceil(cdTimer)}s)`;
+      cdFill.style.width = `${(1 - cdTimer / CFG.cooldown) * 100}%`;
+      document.getElementById('stState').textContent = 'Cooldown';
+    }
+  }
+
+  document.getElementById('mFixed').onclick = () => {
+    CFG.mode = 'fixed';
+    document.getElementById('mFixed').classList.add('active');
+    document.getElementById('mFollow').classList.remove('active');
+  };
+  document.getElementById('mFollow').onclick = () => {
+    CFG.mode = 'follow';
+    document.getElementById('mFollow').classList.add('active');
+    document.getElementById('mFixed').classList.remove('active');
+  };
+
+  const bindSl = (id, vid, key, suffix) => {
+    const el = document.getElementById(id), v = document.getElementById(vid);
+    el.oninput = () => {
+      CFG[key] = +el.value;
+      v.textContent = el.value + suffix;
+      if (key === 'rad') areaRing.scale.setScalar(CFG.rad);
+    };
+  };
+  bindSl('slCount', 'vCount', 'count', '');
+  bindSl('slDur',   'vDur',   'dur',   's');
+  bindSl('slDmg',   'vDmg',   'dmg',   '');
+  bindSl('slRad',   'vRad',   'rad',   'u');
+
+  document.getElementById('btnWave').onclick = spawnSwarm;
+  document.getElementById('btnResetCd').onclick = () => {
+    if (laserState === 'cooling') { cdTimer = 0; laserState = 'ready'; updateUIState(); }
+  };
+
+  window.addEventListener('resize', () => {
+    const a = window.innerWidth / window.innerHeight;
+    cam.left = -viewH * a / 2; cam.right = viewH * a / 2;
+    cam.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // --- LOOP PRINCIPALE ---
+  let lastT = performance.now(), spawnAcc = 0;
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+
+    // Auto-spawn di rinforzi per tenere sempre viva la strada nello spike
+    spawnAcc += dt;
+    if (spawnAcc > 2.2 && monsters.length < 18) {
+      spawnAcc = 0;
+      spawnMonster(Math.random() < 0.22, 0);
+    }
+
+    // Timer Carica Felina
+    if (laserState === 'active') {
+      laserTimer -= dt;
+      const p = 1 + Math.sin(now * 0.018) * 0.22;
+      laserRing.scale.setScalar(p);
+      laserDot.scale.setScalar(0.9 + Math.sin(now * 0.025) * 0.2);
+      if (laserTimer <= 0) {
+        laserGroup.visible = false;
+        laserState = 'cooling';
+        cdTimer = CFG.cooldown;
+        for (const c of cats) c.leaving = true;
+      }
+      updateUIState();
+    } else if (laserState === 'cooling') {
+      cdTimer -= dt;
+      if (cdTimer <= 0) { cdTimer = 0; laserState = 'ready'; }
+      updateUIState();
+    }
+
+    // Aggiorna Mostri
+    for (let i = monsters.length - 1; i >= 0; i--) {
+      const m = monsters[i];
+      m.u += m.spd * dt;
+      if (m.u >= 1) { m.u = 0; }
+      const pt = roadCurve.getPointAt(m.u);
+      const tan = roadCurve.getTangentAt(m.u);
+      const nx = -tan.z, nz = tan.x;
+      m.g.position.set(pt.x + nx * m.lat, 0, pt.z + nz * m.lat);
+      m.hpFg.scale.x = Math.max(0.001, m.hp / m.maxHp);
+      m.hpFg.lookAt(cam.position);
+      m.g.children[1].lookAt(cam.position);
+
+      if (m.hitCd > 0) m.hitCd -= dt;
+      if (m.flash > 0) {
+        m.flash -= dt * 6;
+        m.mat.emissive.setHex(m.flash > 0 ? 0xff4444 : 0x000000);
+      }
+    }
+
+    // Aggiorna Orda di Gatti
+    for (let i = cats.length - 1; i >= 0; i--) {
+      const c = cats[i];
+      if (c.atkCd > 0) c.atkCd -= dt;
+      let tx, tz;
+      if (c.leaving) {
+        tx = c.exitX; tz = c.exitZ;
+      } else {
+        c.orbAng += c.orbDir * dt * 5.2;
+        tx = laserPos.x + Math.cos(c.orbAng) * c.orbRad;
+        tz = laserPos.z + Math.sin(c.orbAng) * c.orbRad;
+      }
+      const dx = tx - c.x, dz = tz - c.z, dist = Math.hypot(dx, dz) || 0.001;
+      const desiredVx = (dx / dist) * c.spd, desiredVz = (dz / dist) * c.spd;
+      const steer = c.leaving ? 6.0 : 10.5;
+      c.vx += (desiredVx - c.vx) * Math.min(1, dt * steer);
+      c.vz += (desiredVz - c.vz) * Math.min(1, dt * steer);
+      c.x += c.vx * dt;
+      c.z += c.vz * dt;
+
+      // Balzo felino durante la corsa
+      c.hopPh += dt * 19;
+      const hopY = Math.abs(Math.sin(c.hopPh)) * 0.45;
+      c.mesh.position.set(c.x, hopY, c.z);
+      c.mesh.rotation.y = Math.atan2(c.vx, c.vz);
+      c.mesh.userData.tail.rotation.z = Math.sin(c.hopPh * 1.2) * 0.45;
+
+      // Danno ai mostri travolti!
+      if (!c.leaving && c.atkCd <= 0) {
+        for (let j = monsters.length - 1; j >= 0; j--) {
+          const m = monsters[j];
+          const md = Math.hypot(m.g.position.x - c.x, m.g.position.z - c.z);
+          if (md < m.rad + 0.65) {
+            m.hp -= CFG.dmg;
+            m.flash = 1.0;
+            c.atkCd = 0.28;
+            spawnBurst(m.g.position.x, 0.5, m.g.position.z, 0xffe082, 5);
+            if (Math.random() < 0.45) SFX.hit();
+            if (m.hp <= 0) {
+              spawnBurst(m.g.position.x, 0.5, m.g.position.z, 0x84cc16, 12);
+              scene.remove(m.g);
+              monsters.splice(j, 1);
+              kills++;
+            }
+            break;
+          }
+        }
+      }
+
+      // Rimuovi i gatti usciti dallo schermo
+      if (c.leaving && (Math.abs(c.x) > 25 || Math.abs(c.z) > 25)) {
+        scene.remove(c.mesh);
+        cats.splice(i, 1);
+      }
+    }
+
+    // Particelle
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { scene.remove(p.m); parts.splice(i, 1); continue; }
+      p.vy -= 12 * dt;
+      p.m.position.x += p.vx * dt;
+      p.m.position.y = Math.max(0.05, p.m.position.y + p.vy * dt);
+      p.m.position.z += p.vz * dt;
+      p.m.material.opacity = p.life / p.max;
+      p.m.scale.setScalar(0.5 + (p.life / p.max) * 0.8);
+    }
+
+    document.getElementById('stMons').textContent = monsters.length;
+    document.getElementById('stKills').textContent = kills;
+    document.getElementById('stCats').textContent = cats.length;
+
+    renderer.render(scene, cam);
+  }
+  animate(lastT);
+  </script>
+</body>
+</html>

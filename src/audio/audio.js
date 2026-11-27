@@ -211,6 +211,22 @@ const AU = (function () {
     sw(o.frequency, t + 0.015, 600 * k, 135 * k, 0.055); ad(g.gain, t + 0.015, 0.48, 0.002, 0.055);
   };
 
+  S.laserClick = (d, t) => {
+    const g = gn(d), o = osc('sine', 1400, t, 0.09, g);
+    sw(o.frequency, t, 1400, 2650, 0.06);
+    ad(g.gain, t, 0.34, 0.003, 0.08);
+  };
+
+  S.catMeow = (d, t, p) => {
+    const base = (510 + (p || 0.5) * 210) * rr(0.94, 1.06);
+    const g = gn(d), f = flt(g, 'bandpass', 1350, 3.0);
+    const o = osc('sawtooth', base * 0.85, t, 0.27, f);
+    o.frequency.setValueAtTime(base * 0.85, t);
+    o.frequency.exponentialRampToValueAtTime(base * 1.28, t + 0.08);
+    o.frequency.exponentialRampToValueAtTime(base * 0.72, t + 0.25);
+    ad(g.gain, t, 0.26, 0.025, 0.24);
+  };
+
   S.catFire = (d, t, p) => {
     const lvl = pToLvl(p);
     const pitchMul = [0, 1.22, 1.04, 0.88, 0.74][lvl] * rr(0.96, 1.04);
@@ -518,6 +534,8 @@ const AU = (function () {
     catMagma:  [S.catMagma,  0.06,  0.35, 2, 0.55, 0.82, 'hybrid'],
     catPyro:   [S.catPyro,   0.05,  0.26, 2, 0.30, 0.80, 'hybrid'],
     catMut:    [S.catMut,    0.06,  0.30, 2, 0.45, 0.85, 'mut'],
+    laserClick:[S.laserClick,0.05,  0.14, 2, 0.12, 0.72, 'laser'],
+    catMeow:   [S.catMeow,   0.06,  0.24, 2, 0.30, 0.74, 'claw'],
 
     bow: [S.bow, 0.05, 0.18, 1, 0.3, 0.55],
     arrowHit: [S.arrowHit, 0.045, 0.12, 0, 0.15, 0.5],

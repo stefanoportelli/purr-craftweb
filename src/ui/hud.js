@@ -209,6 +209,7 @@ const PX = (() => {
     S: '#9aa3b0', s: '#5b6472', k: '#353b49',
     W: '#8a6a48', w: '#5a4330',
     P: '#f57a94', v: '#42b862', f: '#ffffff',
+    R: '#ff2e55', r: '#b91c1c',
     o: '#0b0d14',
   };
 
@@ -369,27 +370,39 @@ const PX = (() => {
       'oksko',
       '.ooo.',
     ],
-    starOn: [
-      '....o....',
-      '...oYo...',
-      '..oYYYo..',
-      'ooYYYYYoo',
-      '.oYYYYYo.',
-      '..oYYYo..',
-      '.oYY.YYo.',
-      '.oYo.oYo.',
-      '..o...o..',
+    pawOn: [
+      '...oo.oo...',
+      '..oYYoYYo..',
+      '.ooYYoYYoo.',
+      'oYYoo.ooYYo',
+      'oGGo...oGGo',
+      '.oo.ooo.oo.',
+      '..ooYYYoo..',
+      '.oYYYYYYYo.',
+      '.oYGGGGGYo.',
+      '..ooooooo..',
     ],
-    starOff: [
-      '....o....',
-      '...oko...',
-      '..oksko..',
-      'ookkkkoo.',
-      '.okkkko..',
-      '..oksko..',
-      '.oks.sko.',
-      '.oko.oko.',
-      '..o...o..',
+    pawOff: [
+      '...oo.oo...',
+      '..okkokko..',
+      '.ookkokkoo.',
+      'okkoo.ookko',
+      'osso...osso',
+      '.oo.ooo.oo.',
+      '..ookkkoo..',
+      '.okkkkkkko.',
+      '.oksssssko.',
+      '..ooooooo..',
+    ],
+    laser: [
+      '...oooo...',
+      '..oRRRRo..',
+      '.oRRffRRo.',
+      'oRRffffRRo',
+      'oRRffffRRo',
+      '.oRRffRRo.',
+      '..oRRRRo..',
+      '...oooo...',
     ],
   };
 
@@ -487,15 +500,34 @@ const UI = (() => {
       U.ptrs.set(e.pointerId, { x, y, x0: x, y0: y });
       audioGesture();
       CAM.za = null;
-      if (U.ptrs.size === 1) { const b = btnAt(x, y); U.gest = { mode: 'tap', hud: !!b || hudAt(x, y), btn: b }; U.press = b ? b.id : null; }
+      if (U.ptrs.size === 1) {
+        const b = btnAt(x, y);
+        const ch = typeof CHARGE !== 'undefined' ? CHARGE : null;
+        if (!b && !hudAt(x, y) && ch && (ch.state === 'armed' || ch.state === 'active')) {
+          const pt = ch.screenToWorld(x, y);
+          if (pt) {
+            touchInput();
+            if (ch.state === 'armed') { ch.trigger(pt.x, pt.z); buzz(14); }
+            else ch.moveTo(pt.x, pt.z);
+          }
+          U.gest = { mode: 'charge', hud: true, btn: null }; U.press = null;
+        } else {
+          U.gest = { mode: 'tap', hud: !!b || hudAt(x, y), btn: b }; U.press = b ? b.id : null;
+        }
+      }
       else if (U.ptrs.size === 2) { const [a, b] = [...U.ptrs.values()]; U.gest = { mode: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y) || 1, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; U.press = null; }
       e.preventDefault();
     }, { passive: false });
     window.addEventListener('pointermove', e => {
       const [x, y] = pos(e), p = U.ptrs.get(e.pointerId);
       if (e.pointerType === 'mouse' || p) { U.mx = x; U.my = y; U.inside = true; U.moved = 0; U.gp.active = false; }
+      if (typeof CHARGE !== 'undefined' && (CHARGE.state === 'armed' || CHARGE.state === 'active') && (e.pointerType === 'mouse' || p)) {
+        const pt = CHARGE.screenToWorld(x, y);
+        if (pt) CHARGE.moveTo(pt.x, pt.z);
+      }
       if (!p) return;
       const g = U.gest;
+      if (g && g.mode === 'charge') { p.x = x; p.y = y; return; }
       if (g && g.mode === 'pinch' && U.ptrs.size >= 2) {
         p.x = x; p.y = y; const [a, b] = [...U.ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1, cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
         camPan(cx - g.cx, cy - g.cy); camZoomAt(d / g.d, cx, cy); g.d = d; g.cx = cx; g.cy = cy; return;
@@ -544,7 +576,8 @@ const UI = (() => {
         if (t) { touchInput(); doMutate(t, 'fire'); }
       }
       else if (k === ' ' || k === 'Enter') { callWave(); e.preventDefault(); }
-      else if (k === 'Escape') { U.closeMenu(); }
+      else if (k === 'Escape') { U.closeMenu(); if (typeof CHARGE !== 'undefined') CHARGE.cancel(); }
+      else if (k === 'q' || k === 'Q') { toggleCharge(); e.preventDefault(); }
       else if (k === 'x' || k === 'X' || k === 'Delete' || k === 'Backspace') { const t = U.menu && U.menu.tower; if (t) { touchInput(); if (U.menu.sellArm) doSell(t); else { U.menu.sellArm = true; sfx('uiHover', t.x, t.z, .8); } } }
       else if (k === 'p' || k === 'P') { togglePause(); }
       else if (k === 'Tab') { cycleSpeed(); e.preventDefault(); }
@@ -567,6 +600,16 @@ const UI = (() => {
     U.banner(on ? 'Grafica Lite: ON' : 'Grafica HD: ON', 1.5, false);
     sfx('uiClick', CAM.x, CAM.z, .6);
     buzz(8);
+  }
+  function toggleCharge() {
+    if (typeof CHARGE === 'undefined' || G.phase !== 'play') return;
+    touchInput();
+    if (CHARGE.state === 'ready' || CHARGE.state === 'armed') {
+      CHARGE.arm();
+      buzz(10);
+    } else if (CHARGE.state === 'cooling') {
+      deny();
+    }
   }
   U.sawMonster = type => { if (G.seen[type]) return; G.seen[type] = 1; if (MON[type].tip && U.tips.length < 4) U.tips.push(type); };
   U.keepAwake = () => { try { if (navigator.wakeLock && !document.hidden && (!U.wake || U.wake.released)) navigator.wakeLock.request('screen').then(w => { U.wake = w; }, () => {}); } catch (e) {} };
@@ -678,7 +721,7 @@ const UI = (() => {
     pollGamepad(dt);
     if (U.menu) { U.menu.t += dt; if ((U.menu.tower && !U.menu.tower.alive) || G.phase !== 'play') U.menu = null; else if (U.menu.pad.tower !== U.menu.tower) U.menu.tower = U.menu.pad.tower; }
     if (G.phase !== 'play') { U.armed = null; U.hover = null; }
-    else U.hover = (U.inside && !U.touch && !U.hotBtn && !U.panning) ? pickPad(U.mx, U.my) : null;
+    else U.hover = (U.inside && !U.touch && !U.hotBtn && !U.panning && !(typeof CHARGE !== 'undefined' && (CHARGE.state === 'armed' || CHARGE.state === 'active'))) ? pickPad(U.mx, U.my) : null;
     if (U.goldShown > G.gold) U.goldShown = G.gold;
     if (!U.coins.length && U.goldShown < G.gold) U.goldShown = Math.min(G.gold, U.goldShown + Math.max(1, (G.gold - U.goldShown) * 6 * dt));
     const tgt = U.menu ? U.menu : (U.gp.active && U.gp.sel >= 0 && G.phase === 'play' ? { pad: G.B.pads[U.gp.sel], tower: G.B.pads[U.gp.sel].tower } : U.hover);
@@ -763,6 +806,27 @@ const UI = (() => {
       U.soundRect = sq('sound', xl, wide ? wl : zb, soundTap, AU.ready ? (AU.muted ? 'Sound is off (M)' : 'Sound is on (M)') : 'Sound', (x, y) => { if (wide) { PX.icon(c, icn, x + pad, y + Math.round((zb - ih2 * s) / 2), s, .85); text(lbl, x + pad + iw2 * s + 3 * s, y + Math.round((zb - LH) / 2) + s, COLR.tx); } else PX.icon(c, icn, x + Math.round((zb - iw2 * k) / 2), y + Math.round((zb - ih2 * k) / 2), k, AU.ready ? 1 : .8); }, !AU.ready);
       xl += (wide ? wl : zb) + g3; }
     sq('perf', xl, zb, togglePerf, R.perf ? 'Grafica Lite: ON (L)' : 'Grafica HD · clicca per Lite (L)', label(R.perf ? 'LT' : 'HD', R.perf ? COLR.cold : COLR.tx), R.perf); xl += zb + g3;
+    if (typeof CHARGE !== 'undefined' && G.phase === 'play') {
+      const ch = CHARGE, C = ch.cfg();
+      const chLbl = ch.state === 'ready' ? 'LASER' : (ch.state === 'armed' ? 'PUNTA!' : (ch.state === 'active' ? ch.timer.toFixed(1) + 's' : Math.ceil(ch.cd) + 's'));
+      const [liw, lih] = PX.iconSize('laser');
+      const chW = Math.max(zb + 12 * s, liw * s + 5 * s + tw('PUNTA!') + pad * 2);
+      const chTip = ch.state === 'ready' ? 'Carica Felina (Q) · Segui il puntino' : (ch.state === 'armed' ? 'Clicca sulla strada per lanciare!' : (ch.state === 'active' ? 'Muovi cursore/dito per guidare i gatti!' : 'Carica Felina in ricarica'));
+      sq('charge', xl, chW, toggleCharge, chTip, (x, y) => {
+        if (ch.state === 'cooling' && C.cooldown > 0) {
+          const fracC = sat(1 - ch.cd / C.cooldown);
+          c.fillStyle = 'rgba(255,46,85,0.22)';
+          c.fillRect(x + 2 * s, y + 2 * s, Math.round((chW - 4 * s) * fracC), zb - 4 * s);
+        } else if (ch.state === 'armed' || ch.state === 'active') {
+          c.fillStyle = 'rgba(255,46,85,0.28)';
+          c.fillRect(x + 2 * s, y + 2 * s, chW - 4 * s, zb - 4 * s);
+        }
+        PX.icon(c, 'laser', x + pad - s, y + Math.round((zb - lih * s) / 2), s, ch.state === 'cooling' ? 0.4 : 1);
+        const colT = ch.state === 'armed' ? '#ffffff' : (ch.state === 'active' ? '#ff8a9e' : (ch.state === 'ready' ? '#ffd6de' : COLR.dim));
+        text(chLbl, x + pad + liw * s + 2 * s, y + Math.round((zb - LH) / 2) + s, colT);
+      }, ch.state === 'armed' || ch.state === 'active');
+      xl += chW + g3;
+    }
     let xr = Wr - 5 * s - zb; const cur = camZoomNow();
     if (nR === 3) { sq('full', xr, zb, toggleFull, 'Full screen', corners, false); xr -= zb + g3; }
     sq('zin', xr, zb, () => camZoomBy(1.5), 'Zoom in (+)', glyph('+', cur < 2.99 ? COLR.tx : '#5a5448'), false); xr -= zb + g3;
@@ -776,6 +840,13 @@ const UI = (() => {
     if (tipB && !tch) { const w = tw(tipB.tip) + pad * 2, x = clamp(Math.round(tipB.x - w / 2), 4 * s + iL, Wr - w - 4 * s); plate(x, yB - g3 - hB, w, hB, { bd: COLR.bdHi }); text(tipB.tip, x + pad, yB - g3 - hB + pad - s, COLR.tx); yUp = Math.min(yUp, yB - g3 - hB - g3); }
     const wrap = (str, maxW) => { const out = []; let cur2 = ''; for (const wd of str.split(' ')) { const t = cur2 ? cur2 + ' ' + wd : wd; if (cur2 && tw(t) > maxW) { out.push(cur2); cur2 = wd; } else cur2 = t; } if (cur2) out.push(cur2); return out; };
     const boxW = Wr - iL - 10 * s;
+    if (typeof CHARGE !== 'undefined' && CHARGE.state === 'armed' && G.phase === 'play') {
+      const t1 = tch ? 'Tocca e trascina il puntino rosso!' : 'Clicca sulla strada e guida il puntino rosso!';
+      const w = tw(t1) + pad * 2, h = LH + pad * 2 - s;
+      plate(Math.round(W / 2 - w / 2), yUp - h, w, h, { bd: '#ff2e55', bg: 'rgba(36,10,18,0.92)' });
+      text(t1, W / 2, yUp - h + pad - s, '#ffd6de', { align: 'c' });
+      yUp -= h + g3;
+    }
     if (G.paused && !G.summary) { const k = s + 1, t1 = 'In Pausa', w = PX.measure(t1) * k + pad * 4, h = PX.LINE * k + pad * 2; plate(Math.round(W / 2 - w / 2), yUp - h, w, h, { bd: COLR.bdHi }); PX.text(c, t1, W / 2, yUp - h + pad, k, COLR.amber, { align: 'c' }); yUp -= h + g3; }
     if (U.tip && !U.menu) {
       const d = MON[U.tip.type], a = sat(Math.min(U.tip.t * 4, (5.2 - U.tip.t) * 2)), head = (d.boss ? 'Boss: ' : 'New: ') + d.name, lines = wrap(d.tip, Math.min(boxW - pad * 2, 46 * 6 * s));
@@ -913,7 +984,7 @@ const UI = (() => {
       const hpLine = 'HP Nucleo: ' + sm.lives + '/' + sm.maxLives + (sm.won ? (' (' + Math.round(sm.lives * 100 / sm.maxLives) + '%)') : (' · Wave ' + sm.wave));
       const stLine = 'Abbattuti: ' + sm.slain + ' · DNA: ' + sm.dna;
       const tierTip = sm.won
-        ? (sm.stars === 3 ? 'Valutazione Perfetta: 3/3 Stelle!' : (sm.stars === 2 ? '3 Stelle: chiudi al 100% HP' : '2 Stelle: chiudi con >=80% HP'))
+        ? (sm.stars === 3 ? 'Valutazione Perfetta: 3/3 Zampe!' : (sm.stars === 2 ? '3 Zampe: chiudi al 100% HP' : '2 Zampe: chiudi con >=80% HP'))
         : 'Potenzia Fuoco vs Terra e Laser vs Aria';
 
       const bRetryLbl = 'Rigioca';
@@ -929,8 +1000,8 @@ const UI = (() => {
       );
       const cardW = Math.min(Wr - iL - 10 * s, maxTxtW + pad * 4);
       const starSz = Math.max(2, s + 1);
-      const [stW, stH] = PX.iconSize('starOn');
-      const starsRowW = 3 * stW * starSz + 2 * 4 * s;
+      const [stW, stH] = PX.iconSize('pawOn');
+      const starsRowW = 3 * stW * starSz + 2 * 5 * s;
       const hasStars = sm.won ? (stH * starSz + 4 * s) : 0;
       const cardH = pad * 2 + PX.LINE * (s + 2) + 3 * s + hasStars + LH * 3 + 6 * s + btnH;
       const cx = Math.round((iL + Wr - cardW) / 2);
@@ -947,7 +1018,7 @@ const UI = (() => {
         const sx0 = Math.round(cx + (cardW - starsRowW) / 2);
         for (let i = 0; i < 3; i++) {
           const on = i < sm.stars;
-          PX.icon(c, on ? 'starOn' : 'starOff', sx0 + i * (stW * starSz + 4 * s), curY, starSz, on ? 1 : 0.75);
+          PX.icon(c, on ? 'pawOn' : 'pawOff', sx0 + i * (stW * starSz + 5 * s), curY, starSz, on ? 1 : 0.75);
         }
         curY += stH * starSz + 5 * s;
       }

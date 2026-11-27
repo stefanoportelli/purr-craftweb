@@ -1,10 +1,10 @@
 'use strict';
 
 const MON = {
-  polipetto: { name: 'Polipetto di Melma', tip: 'Unita veloce da sciame. Debole contro i colpi ad area.', hp: 50, spd: 1.9, rad: .24, mass: .6, bounty: 4, lives: 5, hitH: .25, top: .55, dmg: 5, atkT: .8, eye: [1.8, 3.4, .5], scale: 1.05, death: 'goo', cat: 'swarm' },
-  abominio: { name: 'Abominio di Roccia', tip: 'Corazzato e lento. Assorbe i graffi fisici, debole al Fuoco.', hp: 350, spd: .85, rad: .48, mass: 8, bounty: 20, lives: 15, hitH: 1.0, top: 2.0, dmg: 15, atkT: 1.4, eye: [1.6, 3.4, .6], scale: 1.45, armor: .6, slowRes: .35, death: 'rock', cat: 'armor' },
-  tentacolo: { name: 'Tentacolo Alato', tip: 'Sorvola la strada: colpisci con il Gatto Laser.', hp: 120, spd: 1.65, rad: .26, mass: .5, bounty: 10, lives: 10, hitH: 0, top: .45, dmg: 10, atkT: 1, eye: [2.2, 3.4, .5], scale: 1.15, fly: true, death: 'bat', cat: 'air', alt: [2.5, 3.3], flap: 13 },
-  amalgama: { name: 'Amalgama Infetta', tip: 'Boss: alla morte genera 4 Polipetti e disattiva un gatto.', hp: 3000, spd: .62, rad: .98, mass: 55, bounty: 150, lives: 100, hitH: 1.5, top: 2.9, dmg: 50, atkT: 1.7, eye: [2.2, 3.8, .5], scale: 2.3, boss: true, death: 'goo', cat: 'armor' },
+  polipetto: { name: 'Polipetto di Melma', tip: 'Unita veloce da sciame. Debole contro i colpi ad area.', hp: 85, spd: 1.9, rad: .24, mass: .6, bounty: 3, lives: 5, hitH: .25, top: .55, dmg: 5, atkT: .8, eye: [1.8, 3.4, .5], scale: 1.05, death: 'goo', cat: 'swarm' },
+  abominio: { name: 'Abominio di Roccia', tip: 'Corazzato e lento. Assorbe i graffi fisici, debole al Fuoco.', hp: 620, spd: .85, rad: .48, mass: 8, bounty: 16, lives: 15, hitH: 1.0, top: 2.0, dmg: 15, atkT: 1.4, eye: [1.6, 3.4, .6], scale: 1.45, armor: .6, slowRes: .35, death: 'rock', cat: 'armor' },
+  tentacolo: { name: 'Tentacolo Alato', tip: 'Sorvola la strada: colpisci con il Gatto Laser.', hp: 210, spd: 1.65, rad: .26, mass: .5, bounty: 8, lives: 10, hitH: 0, top: .45, dmg: 10, atkT: 1, eye: [2.2, 3.4, .5], scale: 1.15, fly: true, death: 'bat', cat: 'air', alt: [2.5, 3.3], flap: 13 },
+  amalgama: { name: 'Amalgama Infetta', tip: 'Boss: alla morte genera 4 Polipetti e disattiva un gatto.', hp: 6500, spd: .62, rad: .98, mass: 55, bounty: 150, lives: 100, hitH: 1.5, top: 2.9, dmg: 50, atkT: 1.7, eye: [2.2, 3.8, .5], scale: 2.3, boss: true, death: 'goo', cat: 'armor' },
 };
 if (typeof BAL !== 'undefined') BAL.sync(false);
 
