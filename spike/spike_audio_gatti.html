@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purr-craft — Spike Audio Gatti (Progressione DNA Lv 1 → 4)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      background: #0b1019; color: #e6edf3; min-height: 100vh;
+      padding: 18px; display: flex; flex-direction: column; align-items: center;
+    }
+    .wrap { width: 100%; max-width: 1060px; }
+    header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+      background: rgba(16, 24, 38, 0.96); border: 1px solid #263954; border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 14px;
+    }
+    h1 { font-size: 18px; color: #ffd97d; letter-spacing: 0.3px; }
+    .sub { font-size: 12px; color: #94a3b8; margin-top: 3px; }
+    .row-top { display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 11.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+      background: #143628; border: 1px solid #22c55e; color: #86efac;
+    }
+    .ctrl-btn {
+      background: #1e293b; color: #fff; border: 1px solid #475569;
+      border-radius: 7px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .ctrl-btn:hover { background: #334155; }
+    .ctrl-btn.active { background: #0f766e; border-color: #2dd4bf; }
+    .ctrl-btn.danger { background: #7f1d1d; border-color: #ef4444; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: rgba(15, 22, 34, 0.95); border: 1px solid #24354d;
+      border-radius: 12px; padding: 14px 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card h2 {
+      font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.7px;
+      color: #93c5fd; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .card h2 small { font-size: 11px; color: #64748b; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+    .lvl-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+    button.lvl-btn {
+      background: #162132; border: 1px solid #2c415e; border-radius: 8px;
+      padding: 9px 8px; color: #e2e8f0; cursor: pointer; text-align: left; transition: 0.1s;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    button.lvl-btn:hover { background: #20314a; border-color: #4a6b96; }
+    button.lvl-btn:active, button.lvl-btn.flash { transform: translateY(1px); border-color: #fbbf24; background: #283c59; }
+    button.lvl-btn .lt { font-size: 12.5px; font-weight: 700; }
+    button.lvl-btn .ld { font-size: 10.5px; color: #94a3b8; }
+
+    button.lvl-btn.fire { border-top: 3px solid #f97316; }
+    button.lvl-btn.fire .lt { color: #fdba74; }
+    button.lvl-btn.elec { border-top: 3px solid #38bdf8; }
+    button.lvl-btn.elec .lt { color: #7dd3fc; }
+    button.lvl-btn.hybrid { border-top: 3px solid #e879f9; }
+    button.lvl-btn.hybrid .lt { color: #f0abfc; }
+
+    .bar-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+    .note {
+      font-size: 11.5px; color: #94a3b8; line-height: 1.45;
+      background: #0c1320; border: 1px solid #1d2d44; border-radius: 8px; padding: 8px 10px; margin-top: 10px;
+    }
+    .note b { color: #e2e8f0; }
+
+    #scope {
+      width: 100%; height: 64px; background: #070b12; border: 1px solid #1e2d42;
+      border-radius: 8px; display: block; margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Purr-craft — Spike Audio Gatti (Progressione DNA Lv 1 → 4)</h1>
+        <div class="sub">Ogni livello ha ora un timbro, peso e strato armonico distinto. Sottofondo impostato sui tuoi valori (50 / 52 / 65 / 55 / 25).</div>
+      </div>
+      <div class="row-top">
+        <span class="badge">Sottofondo Lab: ATTIVO</span>
+        <button id="btnAmb" class="ctrl-btn active">Sottofondo: ON</button>
+        <button id="btnStop" class="ctrl-btn danger">Stop Raffiche</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- GATTO FUOCO -->
+      <div class="card">
+        <h2>🔴 Gatto Fuoco → Vulcano <small>Lancio + Esplosione Splash</small></h2>
+        <div class="lvl-row">
+          <button class="lvl-btn fire" data-play="fire1">
+            <span class="lt">Lv 1 · Scintilla</span>
+            <span class="ld">Leggero, acuto, pop rapido</span>
+          </button>
+          <button class="lvl-btn fire" data-play="fire2">
+            <span class="lt">Lv 2 · Fiammata</span>
+            <span class="ld">Più corpo + impatto medio</span>
+          </button>
+          <button class="lvl-btn fire" data-play="fire3">
+            <span class="lt">Lv 3 · Doppio Getto</span>
+            <span class="ld">Doppia bocca + sub grave</span>
+          </button>
+          <button class="lvl-btn fire" data-play="fire4">
+            <span class="lt">Lv 4 · Vulcano</span>
+            <span class="ld">Ruggito magma + boato</span>
+          </button>
+        </div>
+        <div class="bar-actions">
+          <button class="ctrl-btn" data-scala="fire">Ascolta Scala Lv 1 → 4</button>
+          <button class="ctrl-btn" data-raf="fire1">Raffica Lv 1</button>
+          <button class="ctrl-btn" data-raf="fire4">Raffica Lv 4 (Vulcano)</button>
+        </div>
+        <div class="note">
+          <b>Come cambia col livello:</b> dal Lv 1 al Lv 4 si abbassa il tono dell'esplosione, aumenta la durata della coda lavica, al Lv 3 entra il doppio soffio (2 ugelli) e al Lv 4 si aggiunge un ruggito sub-basso + sfrigolio di lapilli.
+        </div>
+      </div>
+
+      <!-- GATTO ELETTRICO -->
+      <div class="card">
+        <h2>🟡 Gatto Elettrico → Cyborg <small>Laser dal Monocolo</small></h2>
+        <div class="lvl-row">
+          <button class="lvl-btn elec" data-play="elec1">
+            <span class="lt">Lv 1 · Impulso</span>
+            <span class="ld">Singolo raggio pulito</span>
+          </button>
+          <button class="lvl-btn elec" data-play="elec2">
+            <span class="lt">Lv 2 · Doppio Fascio</span>
+            <span class="ld">Armonica ottava + eco</span>
+          </button>
+          <button class="lvl-btn elec" data-play="elec3">
+            <span class="lt">Lv 3 · Sovraccarico</span>
+            <span class="ld">Sweep più largo + scintilla</span>
+          </button>
+          <button class="lvl-btn elec" data-play="elec4">
+            <span class="lt">Lv 4 · Gatto Cyborg</span>
+            <span class="ld">Raggio iper-carico + sub</span>
+          </button>
+        </div>
+        <div class="bar-actions">
+          <button class="ctrl-btn" data-scala="elec">Ascolta Scala Lv 1 → 4</button>
+          <button class="ctrl-btn" data-raf="elec1">Raffica Lv 1</button>
+          <button class="ctrl-btn" data-raf="elec4">Raffica Lv 4 (Cyborg)</button>
+        </div>
+        <div class="note">
+          <b>Come cambia col livello:</b> al Lv 1 è un impulso breve e leggero; salendo di DNA si aggiungono armoniche cristalline, un crepitio ad alta frequenza al Lv 3 e un colpo di sub-basso + coda plasma al Lv 4 (Aura Azzurra).
+        </div>
+      </div>
+
+      <!-- GATTO BASE + IBRIDI + MUTAZIONI -->
+      <div class="card full">
+        <h2>🐾 Gatto Base, Forme Ibride (4 DNA) &amp; Iniezione Fiale</h2>
+        <div class="lvl-row" style="grid-template-columns: repeat(5, 1fr);">
+          <button class="lvl-btn" data-play="baseClaw">
+            <span class="lt">0 DNA · Graffio Base</span>
+            <span class="ld">Taglio artiglio + colpo</span>
+          </button>
+          <button class="lvl-btn hybrid" data-play="plasma">
+            <span class="lt">2F+2E · Gatto Plasma</span>
+            <span class="ld">Carica + tuono viola (480 HP)</span>
+          </button>
+          <button class="lvl-btn hybrid" data-play="magmaVolt">
+            <span class="lt">3F+1E · Magma Volt</span>
+            <span class="ld">Esplosione + scarica stun</span>
+          </button>
+          <button class="lvl-btn hybrid" data-play="cyborgPyro">
+            <span class="lt">3E+1F · Cyborg Piro</span>
+            <span class="ld">Laser rovente + sfrigolio</span>
+          </button>
+          <button class="lvl-btn" data-play="mutStep">
+            <span class="lt">Mutazione Fiala</span>
+            <span class="ld">Sale di tono Lv 1 → 4</span>
+          </button>
+        </div>
+        <div class="bar-actions">
+          <button class="ctrl-btn" data-scala="mut">Ascolta 4 Fiale consecutive (Lv 1 → 4)</button>
+        </div>
+        <canvas id="scope" width="1000" height="64"></canvas>
+      </div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+const AU = (() => {
+  let ctx = null, sr = 44100;
+  let nMaster, nSfx, nAmb, nMusic, nRevIn, analyser;
+  let bufWhite, bufPink, bufBrown;
+  let V = null;
+  const shapeCurves = {};
+  const bed = { labG: null, labF: null, popBus: null, droneG: null, droneLP: null, popAcc: 0 };
+  const mus = { nextChord: 0, chord: 0, timpAt: 0, timpN: 0 };
+  let ambOn = true, mutIdx = 0;
+
+  const rnd = Math.random;
+  const rr = (a, b) => a + (b - a) * rnd();
+  const cl = (x, a, b) => (x < a ? a : x > b ? b : x);
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  function gn(dest, v) { const g = ctx.createGain(); g.gain.value = v === undefined ? 0 : v; if (dest) g.connect(dest); return g; }
+  function flt(dest, type, f, q) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q !== undefined) b.Q.value = q; if (dest) b.connect(dest); return b; }
+  function panNode(pan, dest) {
+    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = cl(pan, -1, 1); if (dest) p.connect(dest); return p; }
+    return gn(dest, 1);
+  }
+  function shape(dest, drive) {
+    const ws = ctx.createWaveShaper();
+    let c = shapeCurves[drive];
+    if (!c) { c = new Float32Array(1024); const n = Math.tanh(drive); for (let i = 0; i < 1024; i++) c[i] = Math.tanh(drive * (i / 511.5 - 1)) / n; shapeCurves[drive] = c; }
+    ws.curve = c; ws.oversample = '2x'; if (dest) ws.connect(dest); return ws;
+  }
+  function keep(src, e) { if (V && e > V.lastT) { V.last = src; V.lastT = e; } }
+  function osc(type, f, t, dur, dest) {
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; if (dest) o.connect(dest);
+    const e = t + dur + 0.03; o.start(t); o.stop(e); keep(o, e); return o;
+  }
+  function noi(t, dur, dest, buf) {
+    const s = ctx.createBufferSource(); s.buffer = buf || bufWhite; s.loop = true; if (dest) s.connect(dest);
+    const e = t + dur + 0.03; s.start(t, rnd() * (s.buffer.duration - 0.1)); s.stop(e); keep(s, e); return s;
+  }
+  function loopOsc(type, f, dest) { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; if (dest) o.connect(dest); o.start(); return o; }
+  function ad(param, t, peak, a, d) { param.setValueAtTime(0.0001, t); param.linearRampToValueAtTime(Math.max(0.0002, peak), t + a); param.exponentialRampToValueAtTime(0.0001, t + a + d); }
+  function sw(param, t, f0, f1, dur) { param.setValueAtTime(Math.max(1, f0), t); param.exponentialRampToValueAtTime(Math.max(1, f1), t + dur); }
+
+  function grains(dest, t, n, span, peak, dMin, dMax, f0, f1, q) {
+    const g = gn(dest, 0), f = flt(g, 'bandpass', (f0 + f1) * 0.5, q || 4);
+    const ts = [];
+    for (let i = 0; i < n; i++) ts.push(rnd() * rnd() * span);
+    ts.sort((a, b) => a - b);
+    let end = t + 0.01; g.gain.setValueAtTime(0, t);
+    for (let i = 0; i < n; i++) {
+      const ti = t + ts[i], room = i < n - 1 ? ts[i + 1] - ts[i] - 0.004 : 9;
+      if (room < 0.004) continue;
+      const d = Math.min(rr(dMin, dMax), room), a = peak * rr(0.4, 1);
+      f.frequency.setValueAtTime(rr(f0, f1), ti);
+      g.gain.setValueAtTime(0.0001, ti); g.gain.linearRampToValueAtTime(Math.max(0.0002, a), ti + 0.0015); g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.0015 + d);
+      end = ti + 0.0015 + d;
+    }
+    noi(t, end - t + 0.02, f);
+  }
+  function voice(pan, gain, send, bus) {
+    const out = gn(null, gain), tail = panNode(pan, bus || nSfx); out.connect(tail);
+    let wet = null; if (send > 0) { wet = gn(nRevIn, send); tail.connect(wet); }
+    return { out, tail, wet, last: null, lastT: 0 };
+  }
+  function finishVoice(v) {
+    const done = () => { try { v.out.disconnect(); v.tail.disconnect(); if (v.wet) v.wet.disconnect(); } catch (e) {} };
+    if (v.last) v.last.onended = done; else done();
+    if (V === v) V = null;
+  }
+
+  function makeBuffers() {
+    const mk = (secs, fill) => {
+      const len = (sr * secs) | 0, fade = (sr * 0.06) | 0, x = new Float32Array(len + fade);
+      fill(x);
+      let pk = 0; for (let i = 0; i < x.length; i++) pk = Math.max(pk, Math.abs(x[i]));
+      const b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0), k = 1 / (pk || 1);
+      for (let i = 0; i < len; i++) d[i] = x[i] * k;
+      for (let i = 0; i < fade; i++) { const u = i / fade; d[i] = (x[i] * u + x[len + i] * (1 - u)) * k; }
+      return b;
+    };
+    bufWhite = mk(2, x => { for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1; });
+    bufPink = mk(5, x => {
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < x.length; i++) {
+        const w = rnd() * 2 - 1;
+        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+        x[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362; b6 = w * 0.115926;
+      }
+    });
+    bufBrown = mk(5, x => { let b = 0; for (let i = 0; i < x.length; i++) { b = (b + 0.02 * (rnd() * 2 - 1)) / 1.02; x[i] = b; } });
+  }
+  function makeImpulse() {
+    const len = (sr * 2.4) | 0, b = ctx.createBuffer(2, len, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = b.getChannelData(ch); let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr, w = rnd() * 2 - 1, a = cl(0.2 + t * 0.42, 0, 0.94);
+        lp += (w - lp) * (1 - a);
+        d[i] = lp * Math.exp(-t * 2.6) * (t < 0.022 ? t / 0.022 : 1) * (1 + a * 2.0);
+      }
+    }
+    return b;
+  }
+
+  // --- SUONI DEI GATTI CON PROGRESSIONE CHIARA LV 1 -> 4 ---
+
+  // Gatto Base (0 DNA)
+  function playBaseClaw(d, t) {
+    const k = rr(0.92, 1.12);
+    const w = gn(d), wf = flt(w, 'bandpass', 2500 * k, 1.8); noi(t, 0.09, wf);
+    sw(wf.frequency, t, 1400 * k, 4600 * k, 0.06); ad(w.gain, t, 0.44, 0.004, 0.065);
+    const g = gn(d), o = osc('triangle', 460 * k, t + 0.015, 0.08, g);
+    sw(o.frequency, t + 0.015, 600 * k, 135 * k, 0.055); ad(g.gain, t + 0.015, 0.48, 0.002, 0.055);
+  }
+
+  // Gatto Fuoco Lv 1..4 (Lancio + Esplosione Splash dopo 0.22s)
+  function playFireLvl(d, t, lvl) {
+    // 1. Lancio palla di fuoco (più grosso e doppio al Lv 3-4)
+    const pitchMul = [0, 1.22, 1.04, 0.88, 0.74][lvl];
+    const durL = 0.14 + lvl * 0.03;
+    const w = gn(d), wf = flt(w, 'bandpass', 850 * pitchMul, 1.1); noi(t, durL, wf, bufPink);
+    sw(wf.frequency, t, 1500 * pitchMul, 300 * pitchMul, durL * 0.85);
+    ad(w.gain, t, 0.45 + lvl * 0.1, 0.005, durL * 0.85);
+
+    const g = gn(d), o = osc('sine', 210 * pitchMul, t, durL, g);
+    sw(o.frequency, t, 260 * pitchMul, 68 * pitchMul, durL * 0.75);
+    ad(g.gain, t, 0.4 + lvl * 0.1, 0.003, durL * 0.8);
+
+    // Al Lv 3 e 4 (2 bocche da fuoco) aggiunge un secondo soffio sfalsato di 35ms
+    if (lvl >= 3) {
+      const w2 = gn(d), wf2 = flt(w2, 'bandpass', 620, 1.3); noi(t + 0.035, 0.16, wf2, bufPink);
+      sw(wf2.frequency, t + 0.035, 1100, 260, 0.14);
+      ad(w2.gain, t + 0.035, 0.48, 0.005, 0.14);
+    }
+
+    // 2. Esplosione Splash all'impatto (t + 0.22s) — scala drasticamente tra Lv 1 e Lv 4
+    const te = t + 0.22;
+    const drive = [0, 1.1, 1.5, 2.0, 2.7][lvl];
+    const sh = shape(d, drive);
+    const expDur = [0, 0.24, 0.36, 0.52, 0.72][lvl];
+    const baseF  = [0, 135, 105, 82, 62][lvl];
+
+    const eg = gn(sh), eo = osc('sine', baseF, te, expDur, eg);
+    sw(eo.frequency, te, baseF * 1.35, 26, expDur * 0.75);
+    ad(eg.gain, te, 0.55 + lvl * 0.14, 0.003, expDur * 0.82);
+
+    const bn = gn(sh), bf = flt(bn, 'lowpass', 1800 + lvl * 450, 0.8);
+    noi(te, expDur * 0.9, bf);
+    sw(bf.frequency, te, 2200 + lvl * 450, 160, expDur * 0.7);
+    ad(bn.gain, te, 0.42 + lvl * 0.12, 0.002, expDur * 0.78);
+
+    if (lvl >= 2) {
+      // Coda sub-bassa
+      const rg = gn(d), rf = flt(rg, 'lowpass', 165);
+      noi(te + 0.03, expDur * 1.1, rf, bufBrown);
+      ad(rg.gain, te + 0.03, 0.18 * lvl, 0.05, expDur * 0.9);
+    }
+    if (lvl >= 4) {
+      // Lv 4 Vulcano: lapilli incandescenti + ruggito lavico
+      grains(d, te + 0.08, 12, 0.55, 0.26, 0.01, 0.035, 900, 3200, 4);
+    }
+  }
+
+  // Gatto Elettrico Lv 1..4 (Laser dal monocolo olografico)
+  function playElecLvl(d, t, lvl) {
+    const lp = flt(d, 'lowpass', 6200 + lvl * 600);
+    // Strato 1: Impulso laser principale (si allunga e scende più in basso ai livelli alti)
+    const dur = [0, 0.085, 0.11, 0.14, 0.18][lvl];
+    const fStart = [0, 2350, 2150, 1950, 1750][lvl] * rr(0.97, 1.03);
+    const fEnd   = [0, 680,  480,  320,  190][lvl];
+
+    const g1 = gn(lp), o1 = osc(lvl >= 3 ? 'sawtooth' : 'triangle', fStart, t, dur, g1);
+    sw(o1.frequency, t, fStart, fEnd, dur * 0.9);
+    ad(g1.gain, t, 0.36 + lvl * 0.05, 0.002, dur * 0.9);
+
+    // Strato 2 (dal Lv 2): Armonica brillante di puntamento
+    if (lvl >= 2) {
+      const g2 = gn(lp), o2 = osc('sine', fStart * 1.5, t, dur * 0.85, g2);
+      sw(o2.frequency, t, fStart * 1.5, fEnd * 1.5, dur * 0.8);
+      ad(g2.gain, t, 0.14 + lvl * 0.04, 0.001, dur * 0.78);
+    }
+
+    // Strato 3 (dal Lv 3): Scintilla elettrica ad alta frequenza
+    if (lvl >= 3) {
+      const sp = gn(lp), sf = flt(sp, 'bandpass', 4200, 3.5);
+      noi(t, 0.055, sf);
+      ad(sp.gain, t, 0.16 + (lvl - 3) * 0.12, 0.001, 0.045);
+    }
+
+    // Strato 4 (Lv 4 Gatto Cyborg con Aura Azzurra): colpo sub + risonanza energetica
+    if (lvl >= 4) {
+      const sh = shape(d, 1.6);
+      const sg = gn(sh), so = osc('sine', 145, t, 0.19, sg);
+      sw(so.frequency, t, 175, 48, 0.15);
+      ad(sg.gain, t, 0.55, 0.002, 0.16);
+    }
+  }
+
+  // Forme Ibride 4 DNA
+  function playPlasma(d, t) {
+    const sh = shape(d, 2.2);
+    const g = gn(sh), o = osc('sawtooth', 1050, t, 0.3, flt(g, 'lowpass', 2600, 2.2));
+    sw(o.frequency, t, 1450, 120, 0.25); ad(g.gain, t, 0.58, 0.004, 0.26);
+    const sub = gn(sh), o2 = osc('sine', 165, t, 0.35, sub);
+    sw(o2.frequency, t, 190, 42, 0.25); ad(sub.gain, t, 0.8, 0.003, 0.3);
+    grains(d, t + 0.02, 9, 0.22, 0.25, 0.005, 0.02, 2200, 5600, 4);
+  }
+  function playMagmaVolt(d, t) {
+    playFireLvl(d, t, 3);
+    const sp = gn(d), sf = flt(sp, 'bandpass', 3200, 3); noi(t + 0.22, 0.14, sf); ad(sp.gain, t + 0.22, 0.45, 0.002, 0.12);
+  }
+  function playCyborgPyro(d, t) {
+    playElecLvl(d, t, 3);
+    const w = gn(d), wf = flt(w, 'bandpass', 1100, 1.5); noi(t + 0.02, 0.16, wf);
+    sw(wf.frequency, t + 0.02, 1600, 450, 0.14); ad(w.gain, t + 0.02, 0.35, 0.004, 0.14);
+  }
+
+  // Mutazione Fiala (sale di intonazione in base a 1..4 slot DNA)
+  function playMutStep(d, t, lvl) {
+    const notes = [0, 523.25, 659.25, 783.99, 1046.5]; // Do5 -> Mi5 -> Sol5 -> Do6
+    const f = notes[lvl];
+    const g = gn(d), o = osc('triangle', f * 0.5, t, 0.24, g);
+    sw(o.frequency, t, f * 0.5, f, 0.14); ad(g.gain, t, 0.35, 0.01, 0.2);
+    const g2 = gn(d); osc('sine', f, t + 0.08, 0.26, g2); ad(g2.gain, t + 0.08, 0.28 + lvl * 0.04, 0.003, 0.22);
+    if (lvl === 4) {
+      // Accordo brillante al completamento 4/4 DNA!
+      const g3 = gn(d); osc('sine', f * 1.5, t + 0.12, 0.32, g3); ad(g3.gain, t + 0.12, 0.24, 0.004, 0.28);
+    }
+  }
+
+  // --- SOTTOFONDO LABORATORIO CON I TUOI VALORI (50 / 52 / 65 / 55 / 25) ---
+  function startBeds() {
+    bed.popBus = gn(nAmb, 0.65);
+    bed.popBus.connect(gn(nRevIn, 0.42));
+
+    bed.labG = gn(nAmb, 0.55);
+    bed.labG.connect(gn(nRevIn, 0.25));
+    bed.labF = flt(bed.labG, 'lowpass', 260, 0.8);
+    loopOsc('sine', 55.0, gn(bed.labF, 0.16));
+    loopOsc('triangle', 110.0, gn(bed.labF, 0.055));
+    loopOsc('sine', 0.18, gn(bed.labF.frequency, 45));
+
+    bed.droneG = gn(nMusic, 0.25 * 0.32);
+    bed.droneG.connect(gn(nRevIn, 0.3));
+    bed.droneLP = flt(bed.droneG, 'lowpass', 320 + 460 * 0.25, 0.6);
+    [[73.42, -5, 0.45], [73.42, 6, 0.45], [36.71, 0, 0.25]].forEach(a => {
+      const o = loopOsc('sawtooth', a[0], gn(bed.droneLP, a[2])); o.detune.value = a[1];
+    });
+  }
+
+  function labEvent() {
+    const t = ctx.currentTime + rnd() * 0.08, pan = rr(-0.78, 0.78);
+    const v = voice(pan, 1.0, 0.35, bed.popBus); V = v;
+    const r = rnd();
+    if (r < 0.42) {
+      const f0 = rr(680, 1150), g = gn(v.out), o = osc('sine', f0, t, 0.13, g);
+      sw(o.frequency, t, f0, f0 * rr(1.75, 2.25), 0.075); ad(g.gain, t, rr(0.16, 0.28), 0.003, 0.095);
+    } else if (r < 0.76) {
+      const lp = flt(v.out, 'lowpass', 6800);
+      for (let i = 0; i < 2; i++) {
+        const ti = t + i * rr(0.025, 0.05), cg = gn(lp), cf = flt(cg, 'bandpass', rr(2400, 4800), 3.2);
+        noi(ti, 0.03, cf); ad(cg.gain, ti, rr(0.14, 0.26), 0.0006, 0.018);
+      }
+    } else {
+      let ti = t;
+      for (let i = 0; i < 4; i++) {
+        const f0 = rr(240, 460) * (1 + i * 0.08), g = gn(v.out), o = osc('sine', f0, ti, 0.08, g);
+        sw(o.frequency, ti, f0, f0 * 1.75, 0.055); ad(g.gain, ti, rr(0.11, 0.2), 0.004, 0.055);
+        ti += rr(0.055, 0.1);
+      }
+    }
+    finishVoice(v);
+  }
+
+  const CH = [
+    { n: [38, 45, 50, 53, 57], m: [62, 65, 69, 72, 74, 76], to: [1, 2, 4, 3] },
+    { n: [34, 41, 50, 53, 58], m: [62, 65, 70, 74, 69], to: [2, 0, 4] },
+    { n: [31, 43, 46, 50, 55], m: [62, 67, 70, 74, 69], to: [0, 3, 1] },
+    { n: [33, 40, 45, 48, 52], m: [64, 69, 72, 76, 67], to: [0, 1] },
+    { n: [29, 41, 45, 48, 53], m: [60, 65, 69, 72, 77, 67], to: [2, 0, 1] },
+  ];
+  function padChord(t, c, dur) {
+    const v = voice(0, 1, 0.5, nMusic); V = v;
+    const env = gn(v.out), hp = flt(env, 'highpass', 50), sides = [], open = rr(560, 700);
+    for (let s = 0; s < 2; s++) {
+      const l = flt(panNode(s ? 0.4 : -0.4, hp), 'lowpass', 380, 0.5);
+      l.frequency.setValueAtTime(380, t); l.frequency.linearRampToValueAtTime(open, t + dur * 0.5); l.frequency.linearRampToValueAtTime(400, t + dur + 3.5);
+      sides.push(l);
+    }
+    for (let i = 0; i < c.n.length; i++) {
+      const f = mtof(c.n[i]);
+      for (let s = 0; s < 2; s++) { const o = osc('sawtooth', f, t, dur + 5, gn(sides[s], i === 0 ? 0.05 : 0.036)); o.detune.value = (s ? 1 : -1) * rr(4, 8); }
+    }
+    env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(1, t + 3.0); env.gain.setTargetAtTime(0.0001, t + dur, 1.2);
+    finishVoice(v);
+  }
+  function pianoNote(t, m, vel) {
+    const f = mtof(m), v = voice(rr(-0.3, 0.3), 1, 0.75, nMusic); V = v;
+    const lp = flt(v.out, 'lowpass', 2200, 0.4), dec = 3.2 * Math.pow(440 / f, 0.35);
+    [[1, 1, 1], [2.002, 0.3, 0.55], [3.006, 0.1, 0.35]].forEach(h => {
+      const g = gn(lp); osc('sine', f * h[0], t, dec * h[2] + 0.1, g); ad(g.gain, t, vel * 0.11 * h[1], 0.007, dec * h[2]);
+    });
+    finishVoice(v);
+  }
+  function timp(t, vel) {
+    const v = voice(rr(-0.15, 0.15), 1, 0.65, nMusic); V = v;
+    const sh = shape(v.out, 1.4);
+    const g = gn(sh), o = osc('sine', 92.5, t, 1.25, g); sw(o.frequency, t, 118, 73.4, 0.09); ad(g.gain, t, vel * 1.35, 0.004, 1.05);
+    const g2 = gn(sh), o2 = osc('triangle', 146.8, t, 0.85, g2); sw(o2.frequency, t, 175, 110.0, 0.07); ad(g2.gain, t, vel * 0.65, 0.003, 0.7);
+    const n = gn(v.out), nf = flt(n, 'lowpass', 340); noi(t, 0.14, nf); ad(n.gain, t, vel * 0.85, 0.002, 0.09);
+    finishVoice(v);
+  }
+
+  function build() {
+    sr = ctx.sampleRate;
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -8; lim.knee.value = 4; lim.ratio.value = 16; lim.attack.value = 0.002; lim.release.value = 0.18;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+    lim.connect(analyser); analyser.connect(ctx.destination);
+
+    const sh = (dest, type, f, g, q) => { const b = flt(dest, type, f, q); b.gain.value = g; return b; };
+    const eqH = sh(flt(lim, 'highpass', 32, 0.7), 'highshelf', 3000, 1.5);
+    const eqM = sh(eqH, 'peaking', 1200, 1.0, 0.7);
+    const lowSh = sh(eqM, 'lowshelf', 180, -8);
+
+    nMaster = gn(lowSh, 0.50);
+    nSfx = gn(nMaster, 1.0);
+    nAmb = gn(nMaster, 0.9);
+    nMusic = gn(nMaster, 0.52);
+    makeBuffers();
+    const conv = ctx.createConvolver(); conv.buffer = makeImpulse();
+    conv.connect(gn(nMaster, 0.45));
+    nRevIn = gn(null, 1); nRevIn.connect(flt(conv, 'highpass', 120));
+    startBeds();
+    mus.nextChord = ctx.currentTime + 0.3;
+  }
+
+  function unlock() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC(); build();
+    }
+    if (ctx.state !== 'running') ctx.resume();
+  }
+
+  function trigger(id, pan = 0) {
+    unlock();
+    const now = ctx.currentTime + 0.006;
+    const v = voice(pan, 0.9, 0.25, nSfx); V = v;
+    if (id === 'baseClaw') playBaseClaw(v.out, now);
+    else if (id.startsWith('fire')) playFireLvl(v.out, now, +id.slice(4));
+    else if (id.startsWith('elec')) playElecLvl(v.out, now, +id.slice(4));
+    else if (id === 'plasma') playPlasma(v.out, now);
+    else if (id === 'magmaVolt') playMagmaVolt(v.out, now);
+    else if (id === 'cyborgPyro') playCyborgPyro(v.out, now);
+    else if (id === 'mutStep') { mutIdx = (mutIdx % 4) + 1; playMutStep(v.out, now, mutIdx); }
+    else if (id.startsWith('mut')) playMutStep(v.out, now, +id.slice(3));
+    finishVoice(v);
+  }
+
+  function toggleAmb() {
+    unlock();
+    ambOn = !ambOn;
+    nAmb.gain.setTargetAtTime(ambOn ? 0.9 : 0, ctx.currentTime, 0.08);
+    nMusic.gain.setTargetAtTime(ambOn ? 0.52 : 0, ctx.currentTime, 0.08);
+    return ambOn;
+  }
+
+  function tick(dt) {
+    if (!ctx || ctx.state !== 'running' || !ambOn) return;
+    const now = ctx.currentTime;
+    bed.popAcc += dt * (0.25 + 1.35 * 0.65);
+    if (bed.popAcc >= 1) { bed.popAcc -= rr(0.85, 1.45); labEvent(); }
+
+    if (now > mus.nextChord - 0.3) {
+      const t = Math.max(mus.nextChord, now + 0.05), c = CH[mus.chord], dur = rr(10, 14);
+      padChord(t, c, dur);
+      if (rnd() < 0.8) pianoNote(t + rr(2.2, 5.2), c.m[(rnd() * c.m.length) | 0], rr(0.55, 0.95));
+      mus.nextChord = t + dur - 1.0;
+      mus.chord = c.to[(rnd() * c.to.length) | 0];
+    }
+    if (now > mus.timpAt - 0.2) {
+      const t = Math.max(mus.timpAt, now + 0.05);
+      timp(t, (0.28 + 0.45 * 0.25) * (mus.timpN % 4 === 0 ? 1.15 : 0.85));
+      mus.timpN++; mus.timpAt = t + 1.9;
+    }
+  }
+
+  return { trigger, toggleAmb, tick, getAnalyser: () => analyser };
+})();
+
+// --- UI ---
+let timers = [];
+function stopAll() {
+  for (const id of timers) { clearTimeout(id); clearInterval(id); }
+  timers = [];
+  document.querySelectorAll('[data-raf]').forEach(b => b.classList.remove('active'));
+}
+document.getElementById('btnStop').onclick = stopAll;
+
+const btnAmb = document.getElementById('btnAmb');
+btnAmb.onclick = () => {
+  const on = AU.toggleAmb();
+  btnAmb.textContent = 'Sottofondo: ' + (on ? 'ON' : 'OFF');
+  btnAmb.classList.toggle('active', on);
+};
+
+document.querySelectorAll('button.lvl-btn').forEach(btn => {
+  btn.onclick = () => {
+    AU.trigger(btn.dataset.play, (Math.random() - 0.5) * 0.35);
+    btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 120);
+  };
+});
+
+document.querySelectorAll('[data-scala]').forEach(btn => {
+  btn.onclick = () => {
+    stopAll();
+    const prefix = btn.dataset.scala;
+    const gap = prefix === 'fire' ? 750 : 520;
+    for (let lvl = 1; lvl <= 4; lvl++) {
+      timers.push(setTimeout(() => {
+        const key = prefix + lvl;
+        AU.trigger(key, (lvl - 2.5) * 0.25);
+        const target = document.querySelector(`[data-play="${key}"]`);
+        if (target) { target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 180); }
+      }, (lvl - 1) * gap));
+    }
+  };
+});
+
+document.querySelectorAll('[data-raf]').forEach(btn => {
+  btn.onclick = () => {
+    stopAll();
+    btn.classList.add('active');
+    const key = btn.dataset.raf;
+    const rate = key.endsWith('4') ? 290 : 670;
+    AU.trigger(key, 0);
+    timers.push(setInterval(() => AU.trigger(key, (Math.random() - 0.5) * 0.7), rate));
+  };
+});
+
+// Oscilloscopio
+const canvas = document.getElementById('scope'), c2 = canvas.getContext('2d');
+let lastT = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  AU.tick(dt);
+
+  const W = canvas.width, H = canvas.height;
+  c2.fillStyle = '#070b12'; c2.fillRect(0, 0, W, H);
+  c2.strokeStyle = '#142033'; c2.beginPath(); c2.moveTo(0, H / 2); c2.lineTo(W, H / 2); c2.stroke();
+
+  const an = AU.getAnalyser();
+  if (!an) return;
+  const freq = new Uint8Array(an.frequencyBinCount);
+  an.getByteFrequencyData(freq);
+  const bars = 90, step = Math.floor(freq.length / bars), bw = W / bars;
+  for (let i = 0; i < bars; i++) {
+    const v = freq[i * step] / 255, bh = v * (H - 8);
+    c2.fillStyle = `rgba(56, 189, 248, ${0.18 + v * 0.5})`;
+    c2.fillRect(i * bw + 1, H - bh, bw - 2, bh);
+  }
+}
+loop(lastT);
+</script>
+</body>
+</html>

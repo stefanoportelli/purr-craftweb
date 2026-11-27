@@ -1,29 +1,30 @@
-# Cinderwatch
+# Purr-craft
 
-**Cinderwatch** è un tower defense 3D isometrico auto-giocante (*self-playing*), realizzato originariamente come applicazione web *single-file* e scomposto in moduli funzionali per facilitarne la lettura, la manutenzione e le modifiche.
+**Purr-craft** è un tower defense 3D isometrico ambientato in un **Laboratorio Segreto**, evoluto a partire dall'architettura modulare WebGL di *Cinderwatch*. Al posto delle classiche torrette fisse, il giocatore schiera **Gatti Base** e li fa mutare in tempo reale iniettando fino a **4 fiale di DNA elementale** (Fuoco ed Elettrico/Laser), sbloccando evoluzioni pure e forme ibride avanzate.
 
-Non richiede build tool, server locale o dipendenze esterne: tutte le geometrie, le texture, i font pixel-art e gli effetti sonori sono generati proceduralmente via codice.
+Non richiede build tool, bundler o dipendenze esterne oltre a Three.js: tutte le geometrie 3D, le texture, le icone pixel-art, la musica e gli effetti sonori sono sintetizzati proceduralmente via codice.
 
 ---
 
 ## Avvio rapido
 
-Apri direttamente **`Cinderwatch.html`** con un doppio clic in qualsiasi browser moderno con supporto a **WebGL 2**.
+Apri direttamente **`index.html`** (o `Cinderwatch.html` se non ancora rinominato) in qualsiasi browser moderno con supporto a **WebGL 2**, oppure servilo tramite un server statico locale / GitHub Pages.
 
-> **Nota architetturale:** gli script vengono caricati in ordine tramite tag `<script src="...">` standard (invece di ES Modules) per garantire il funzionamento offline tramite protocollo `file://` senza errori CORS.
+> **Nota architetturale:** gli script vengono caricati in ordine tramite tag `<script src="...">` standard (invece di ES Modules) per garantire la massima compatibilità anche offline tramite protocollo `file://` senza errori CORS.
 
 ---
 
 ## Struttura del progetto
 
 ```text
-cinderwatch/
-├── Cinderwatch.html          # Entry point HTML e ordine di caricamento degli script
+purr-craftweb/
+├── index.html                # Entry point HTML e ordine di caricamento degli script
 ├── README.md                 # Questa documentazione
 ├── assets/
-│   └── favicon.svg           # Icona SVG della fiamma
+│   └── favicon.svg           # Icona SVG del progetto
 ├── styles/
 │   └── main.css              # Layout fullscreen, gestione safe-area mobile e splash screen
+├── spike/                    # Showroom 3D e banchi prova audio interattivi standalone
 ├── vendor/
 │   └── three.min.js          # Motore 3D Three.js r170 (libreria di terze parti)
 └── src/
@@ -31,84 +32,112 @@ cinderwatch/
     ├── graphics/
     │   ├── geometry.js       # Texture procedurali, shader materiali, mesh builder (Soup) e palette
     │   ├── renderer.js       # Pipeline WebGL e post-processing (AO, nebbia, DoF, bloom, dithering)
-    │   └── fx.js             # Luci dinamiche, ombre, particelle (fiamme, esplosioni, fulmini) e meteo
+    │   └── fx.js             # Luci dinamiche, ombre, particelle (fiamme, esplosioni, laser) e meteo
     ├── world/
-    │   ├── biomes.js         # Definizione dei 5 biomi (palette, illuminazione, meteo, nemici)
-    │   ├── board.js          # Generatore procedurale di mappa, strada, fiume, piazzole e terreno
-    │   └── props.js          # Costruzione di ponte, fortezza/faro, caverna e oggetti di scena
+    │   ├── biomes.js         # Definizione dei biomi/ambientazioni, palette e illuminazione
+    │   ├── board.js          # Generatore procedurale di mappa, percorso, piazzole e terreno
+    │   └── props.js          # Costruzione di strutture scenografiche, portali di spawn e oggetti lab
     ├── entities/
-    │   └── models.js         # Mesh instanziate di unità/oggetti, rig di animazione e fisica detriti
+    │   └── models.js         # Modelli 3D instanziati di Gatti e Mostri mutanti, rig e fisica detriti
     ├── game/
-    │   ├── towers.js         # Statistiche, costruzione animata e logica di fuoco di torri e proiettili
-    │   ├── units.js          # Statistiche, AI di movimento e combattimento di mostri, boss e guardie
-    │   └── waves.js          # Generazione ondate, comandante IA auto-giocante e transizioni tra mappe
+    │   ├── towers.js         # Sistema DNA (0-4 slot), profili evolutivi dei Gatti, laser e palle di fuoco
+    │   ├── units.js          # Statistiche, abilità e movimento del bestiario mutante e Boss
+    │   └── waves.js          # Gestione ondate, pausa tattica iniziale, economia DNA e IA di supporto
     ├── ui/
-    │   └── hud.js            # Font e icone pixel-art su canvas 2D, menu contestuali e input
+    │   └── hud.js            # Font e icone pixel-art su canvas 2D, menu mutazione DNA e controlli
     ├── audio/
-    │   └── audio.js          # Sintetizzatore procedurale Web Audio (effetti sonori, ambiente, musica)
+    │   └── audio.js          # Sintetizzatore Web Audio (ambiente Laboratorio, SFX evolutivi, Debug Mixer)
     └── core/
         └── main.js           # Telecamera isometrica, game loop principale, scaling adattivo e boot
 ```
 
 ---
 
+## Sistema di Gioco: Gatti & Mutazioni DNA
+
+Ogni piazzola libera permette di schierare un **Gatto Graffiatore (0 DNA)** al costo di `50 DNA`. Selezionando un gatto in campo è possibile iniettare fino a **4 fiale di DNA** (`30 / 50 / 80 / 120 DNA`), combinando liberamente gli elementi disponibili:
+
+* **0 DNA — Gatto Graffiatore (`TERRA`):** attacco rapido corpo a corpo con zampata estensibile su passerella meccanica.
+* **Linea Pura Fuoco (`1-4 DNA Fuoco` · `TERRA`):** equipaggia zaino e lanciafiamme in stile *Ghostbusters* (singolo ugello ai Lv 1-2, doppio ugello ai Lv 3-4) sparando palle di fuoco balistiche con danno ad area (*Splash*), fino alla forma finale **Gatto Vulcano**.
+* **Linea Pura Elettrica (`1-4 DNA Laser` · `ARIA`):** equipaggia **monocolo bionico olografico** con mirino rotante che abbatte i nemici volanti con raggi laser istantanei, fino al **Gatto Cyborg** (dotato di aura energetica azzurra e particelle ascendenti al Lv 4).
+* **Forme Ibride Speciali (4 DNA):**
+  * **Gatto Plasma (`2 Fuoco + 2 Elettrico` · `ARIA`):** scarica pesante ad alto danno singolo (`480 HP`) contro bersagli aerei corazzati.
+  * **Magma Volt (`3 Fuoco + 1 Elettrico` · `TERRA`):** esplosioni ad area elettrificate con probabilità di micro-stordimento (*mini-stun*).
+  * **Cyborg Pirotecnico (`3 Elettrico + 1 Fuoco` · `ARIA`):** raggio laser ad alta cadenza potenziato termicamente.
+* **Scomposizione (Vendita):** ogni gatto può essere scomposto recuperando il **50%** del DNA totale investito.
+
+---
+
 ## Descrizione dei moduli (`src/`)
 
 ### Base e Grafica
-* **`src/utils.js`**: funzioni matematiche (`clamp`, `lerp`, `damp`, easing), generatore di numeri pseudo-casuali con seed (`makeRng`), rumore procedurale 2D (`vnoise`, `fbm`, `pfbm`) e helper per manipolare i colori.
-* **`src/graphics/geometry.js`**: genera la *DataArrayTexture* procedurale per i vari materiali (terra, roccia, muratura, legno, metallo, ecc.), personalizza gli shader standard di Three.js (`litMaterial`), definisce la classe `Soup` per assemblare geometrie 3D complesse e la palette base `COL`.
-* **`src/graphics/renderer.js`**: gestisce il `WebGLRenderer`, i render target a risoluzione ridotta (stile pixel-art) e la catena di shader fullscreen: ambient occlusion e nebbia volumetrica (`atmo`), profondità di campo (`dof`), `bloom`, tone mapping filmico con dithering Bayer (`comp`) e upscaling nitido (`up`).
-* **`src/graphics/fx.js`**: coordina le luci dinamiche (`LT`, tra cui luna, faro, torri, torce e flash), il sistema particellare instanziato (`FX` per fiamme, fumo, scintille, fulmini, decalcomanie a terra e camera shake) e il sistema meteo GPU (`WX`: neve, cenere, lucciole, sabbia).
+* **`src/utils.js`**: funzioni matematiche (`clamp`, `lerp`, `damp`, easing), generatore pseudo-casuale con seed (`makeRng`), rumore procedurale 2D (`vnoise`, `fbm`, `pfbm`) e gestione colori.
+* **`src/graphics/geometry.js`**: genera la *DataArrayTexture* procedurale per i materiali, personalizza gli shader standard di Three.js (`litMaterial`) e definisce la classe `Soup` per assemblare geometrie 3D low-poly.
+* **`src/graphics/renderer.js`**: gestisce il `WebGLRenderer`, i render target a risoluzione ridotta (estetica pixel-art) e il post-processing: ambient occlusion, nebbia (`atmo`), profondità di campo *tilt-shift* (`dof`), `bloom`, tone mapping con dithering Bayer (`comp`) e upscaling nitido (`up`).
+* **`src/graphics/fx.js`**: coordina le luci dinamiche (`LT`), il sistema particellare instanziato (`FX` per esplosioni, fasci laser, scintille, fumo, decalcomanie e camera shake) e gli effetti atmosferici GPU (`WX`).
 
 ### Mondo di Gioco
-* **`src/world/biomes.js`**: configura i 5 biomi ciclici (**Ashen Pass**, **Frostfall**, **Mirefen**, **Emberscar**, **Duskmesa**), ognuno con i propri colori, illuminazione, acqua/lava, meteo, flora e nemici prevalenti.
-* **`src/world/board.js`**: genera proceduralmente ogni isola/passo: calcola il percorso curvo della strada (`tryRoad`), il corso d'acqua (`tryStream`), posiziona le piazzole delle torri (`choosePads`), scolpisce il terreno in chunk 3D e crea la cascata sul bordo.
-* **`src/world/props.js`**: modella le strutture fisse (ponte ad arco, fortezza con torre del faro, caverna di spawn) e distribuisce gli elementi scenografici e la vegetazione specifica di ciascun bioma (`PROP`, `BIOME_DRESS`).
+* **`src/world/biomes.js`**: configura palette cromatiche, illuminazione, liquidi e atmosfera delle arene.
+* **`src/world/board.js`**: genera proceduralmente la mappa di gioco, il tracciato dei nemici, la disposizione strategica delle piazzole e i chunk 3D del terreno.
+* **`src/world/props.js`**: costruisce il nucleo da difendere, il varco d'ingresso dei mostri e gli elementi scenografici di contorno.
 
 ### Entità e Logica di Gioco
-* **`src/entities/models.js`**: costruisce i batch instanziati (`PartBatch`, `KIT`) per tutti i personaggi, mostri, armi e proiettili; contiene i sistemi di animazione procedurale (`rigHuman`, `rigSpider`, `rigWolf`, ecc.) e la fisica dei detriti/monete (`DEB`, `shatter`).
-* **`src/game/towers.js`**: definisce i 4 tipi di torre (`archer`, `bombard`, `spire`, `guard`) con 3 livelli ciascuno, l'animazione di costruzione con impalcature, il puntamento e la fisica di frecce e proiettili d'artiglieria.
-* **`src/game/units.js`**: contiene il bestiario completo (`MON`) con abilità speciali (volo, armatura, sdoppiamento, evocazione, invisibilità, rigenerazione, boss), la simulazione del movimento su corsie e i duelli corpo a corpo con i fanti delle caserme.
-* **`src/game/waves.js`**: gestisce il ritmo delle ondate (`ROSTER`, `buildWave`), il comandante IA (`aiThink`) che costruisce e potenzia in autonomia finché il giocatore non interviene, e le fasi di fine partita o cambio mappa (`clear`, `defeat`, `crumble`, `rise`).
+* **`src/entities/models.js`**: costruisce i batch instanziati (`PartBatch`, `KIT`) e le animazioni procedurali per tutte le evoluzioni dei Gatti (`rigGattoGraffiatore`, `rigGattoFuoco`, `rigGattoElettrico`, `makeHoloMonocle`, `makeCyberAura`) e per il bestiario di Purr-craft: **Polipetto di Melma** (sciame), **Abominio di Roccia** (tank), **Tentacolo Alato** (volante) e il Boss **Amalgama Infetta**.
+* **`src/game/towers.js`**: gestisce la tabella costi DNA, il calcolo dinamico delle forme pure e ibride (`catProfile`), i plinti meccanici con passerella retraibile, i proiettili esplosivi e i raggi laser istantanei.
+* **`src/game/units.js`**: regola movimento su corsie, punti vita, resistenze, stati alterati (rallentamento/stun) e abilità dei mostri mutanti.
+* **`src/game/waves.js`**: scandisce le ondate di nemici e l'arrivo del Boss alla Wave 5, avvia la partita in **Pausa tattica** per consentire il piazzamento iniziale, gestisce l'economia del DNA e include il comandante IA opzionale (`aiThink`) capace di mutare i gatti in Fuoco o Laser in base alle minacce.
 
 ### Interfaccia, Audio e Motore
-* **`src/ui/hud.js`**: implementa un motore di testo e icone pixel-art (`PX`) disegnato sul canvas `#hud`, i menu di costruzione/potenziamento, le barre vita, i suggerimenti sui nuovi nemici e la gestione completa di mouse, touch, tastiera e gamepad.
-* **`src/audio/audio.js`**: motore audio procedurale basato su Web Audio API (`AU`). Sintetizza in tempo reale effetti sonori posizionali (archi, cannoni, fulmini, spade, ruggiti, corni, UI), rumori ambientali (vento, crepitio del fuoco) e accompagnamento musicale dinamico.
-* **`src/core/main.js`**: controlla la telecamera ortografica isometrica (`CAM`, sia in modalità inseguimento automatico dell'azione sia manuale), esegue il loop di simulazione (`step`, `frame`), regola dinamicamente la qualità grafica in base agli FPS ed espone l'oggetto di debug `window.__cw`.
+* **`src/ui/hud.js`**: motore di rendering pixel-art su canvas 2D (`PX`) con icone dedicate per gatti e slot DNA (`slotFire`, `slotElec`, `slotEmpty`), piazzamento rapido su piazzola libera, menu contestuale di mutazione con chiusura immediata alla selezione e anteprima live del raggio d'azione e della forma successiva.
+* **`src/audio/audio.js`**: sintetizzatore Web Audio API (`AU`) progettato su misura per Purr-craft:
+  * **Sottofondo Laboratorio Segreto** privo di fruscio continuo, composto da ronzio armonico caldo (`55 Hz / 110 Hz`), gocciolii riverberati, micro-scariche elettriche, bolle nelle vasche mutagene, accordi dark/piano e timpani dinamici legati alla tensione della battaglia.
+  * **Effetti sonori stratificati per livello DNA (`Lv 1 -> 4`)** per Fuoco, Laser, forme ibride e iniezione fiale, con sistema anti-accumulo (*auto-ducking*) sulle raffiche del Gatto Vulcano Lv 4.
+  * **Mixer Audio Debug In-Game** integrato con salvataggio automatico in `localStorage` ed esportazione JSON.
+* **`src/core/main.js`**: controlla la telecamera ortografica isometrica (`CAM`), il loop di simulazione (`step`, `frame`), lo scaling adattivo degli FPS ed espone l'oggetto `window.__cw`.
 
 ---
 
 ## Controlli principali
 
-Il gioco parte in modalità **AI commander**: puoi osservarlo oppure prendere il controllo in qualsiasi momento interagendo con una piazzola.
+La partita si avvia in **controllo manuale** e in **Pausa (`Paused`)**, così puoi studiare la mappa, piazzare i primi gatti e avviare l'azione quando sei pronto.
 
 | Input | Azione |
 | :--- | :--- |
-| **Click / Tap su piazzola** | Apri menu di costruzione o potenziamento (attiva il controllo manuale) |
-| **`1` – `4`** | Seleziona rapidamente tipo di torre (Archers, Bombard, Spire, Guards) |
-| **`U`** | Potenzia la torre selezionata o sotto il cursore |
-| **`X` / `Canc`** | Vendi la torre selezionata (premi due volte per confermare) |
-| **`Spazio` / `Invio`** | Chiama in anticipo l'ondata successiva (bonus oro) |
-| **`C`** | Alterna tra controllo manuale e comandante IA |
-| **`P`** | Pausa / Riprendi |
+| **Click / Tap su piazzola vuota** | Apre il pannello per piazzare un **Gatto Base** (`50 DNA`) |
+| **Click / Tap su un Gatto** | Apre il menu di mutazione DNA (Fuoco / Laser / Vendi) |
+| **`1`** | Inietta fiala **Fuoco** sul gatto selezionato (o arma il Gatto Base) |
+| **`2` / `E`** | Inietta fiala **Laser (Elettrico)** sul gatto selezionato |
+| **`X` / `Canc` / `Backspace`** | Vendi / Scomponi il gatto selezionato (premi due volte per confermare) |
+| **`P`** | Pausa / Riprendi la partita |
+| **`Spazio` / `Invio`** | Chiama in anticipo l'ondata successiva (bonus DNA) |
 | **`Tab`** | Cambia velocità di gioco (`1x`, `2x`, `3x`) |
+| **`C`** | Alterna tra controllo giocatore (`You command`) e IA (`AI commander`) |
 | **`M`** | Attiva / Disattiva audio |
 | **Trascinamento / `WASD` / Frecce** | Muovi la telecamera |
 | **Rotellina / Pinch / `+` `-` / Doppio tap** | Zoom avanti / indietro |
 | **`0` / `F` / `Home`** | Ripristina l'inseguimento automatico della telecamera |
+| **`F9` / `Alt + A`** | Apre / Chiude il **Mixer Audio Debug** in-game |
 
 ---
 
-## Parametri URL (Debug e Personalizzazione)
+## Modalità Debug e Parametri URL
 
-Puoi aggiungere parametri dopo `#` nell'URL del browser (combinandoli con `&`, es. `Cinderwatch.html#biome=frost&fps`):
+### Mixer Audio Debug In-Game (`F9` / `#debug`)
+Premendo **`F9`** (oppure **`Alt + A`**, o aprendo l'URL con `#debug` / `#audio`) compare in alto a destra il pannello interattivo **Audio Debug**:
+* Regola in tempo reale i volumi di **Sottofondo Laboratorio** (*Master*, *Musica*, *Dettagli Lab*, *Ronzio 55Hz*, *Tensione Base*, *Vento*) e dei singoli gruppi **SFX Gatti & Mostri** (*Graffio*, *Fuoco Lv 1-3*, *Vulcano Lv 4*, *Laser*, *Ibridi 4 DNA*, *Fiala DNA*, *Mostri*).
+* Include pulsanti di **Test Rapido** (attivi anche a gioco in pausa, inclusa la simulazione *Raffica Lv 4*).
+* Salva automaticamente le preferenze in `localStorage` (`purrcraft.audioCfg`), permette il **Reset Default** e dispone del pulsante **Copia Config** per copiare negli appunti il JSON pronto da incollare nei `DEFAULTS` del codice.
 
-* `#fps` — Mostra contatore FPS, risoluzione interna, draw call e numero di mostri.
+### Parametri Hash URL
+Puoi combinare più flag dopo `#` nell'URL del browser (es. `index.html#debug&nodof&fps`):
+
+* `#debug` oppure `#audio` — Apre automaticamente all'avvio il **Mixer Audio Debug**.
+* `#nodof` — Disattiva la sfocatura di profondità di campo (*Depth of Field / Tilt-Shift*), rendendo nitido anche lo sfondo lontano.
+* `#fps` — Mostra contatore FPS, risoluzione interna, draw call e numero di mostri attivi.
 * `#seed=1234` — Genera una mappa deterministica a partire dal seed indicato.
-* `#biome=ashen|frost|fen|ember|dunes` — Forza il bioma iniziale.
+* `#biome=ashen|frost|fen|ember|dunes` — Forza la variante visiva della mappa iniziale.
 * `#level=N` — Parte dal livello di difficoltà `N`.
-* `#nodof` — Disattiva l'effetto profondità di campo (*Depth of Field*).
-* `#noscale` — Disattiva il ridimensionamento automatico della qualità grafica.
+* `#noscale` — Disattiva il ridimensionamento dinamico della risoluzione interna.
 
 ---
 

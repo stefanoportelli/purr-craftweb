@@ -1,7 +1,37 @@
 'use strict';
 
 const AU = (function () {
-  const api = { ready: false, muted: false, unlock: unlock, setMuted: setMuted, setPaused: setPaused, play: play, setAmbience: setAmbience, update: update };
+  const DEFAULTS = {
+    master: 0.50,
+    music: 0.52,
+    labDetails: 0.65,
+    labHum: 0.55,
+    tensionBase: 0.25,
+    wind: 0.00,
+    sfx: 1.00,
+    claw: 0.85,
+    fire: 0.85,
+    volcano: 0.58,
+    laser: 0.82,
+    hybrid: 0.80,
+    mut: 0.85,
+    monster: 0.85,
+  };
+  const STORAGE_KEY = 'purrcraft.audioCfg';
+  const cfg = Object.assign({}, DEFAULTS);
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      for (const k in DEFAULTS) if (typeof saved[k] === 'number' && isFinite(saved[k])) cfg[k] = Math.max(0, Math.min(1.5, saved[k]));
+    }
+  } catch (e) {}
+
+  const api = {
+    ready: false, muted: false, cfg: cfg,
+    unlock: unlock, setMuted: setMuted, setPaused: setPaused,
+    play: play, setAmbience: setAmbience, update: update,
+    setCfg: setCfg, resetCfg: resetCfg, toggleDebug: toggleDebug
+  };
 
   let ctx = null, sr = 44100;
   let nMaster = null, nMute = null, nSfx = null, nAmb = null, nMusic = null, nRevIn = null;
@@ -10,14 +40,37 @@ const AU = (function () {
   const shapeCurves = {};
   const ends = [];
   const last = {};
-  const tgt = { fire: 0, wind: 0, tension: 0 }, cur = { fire: 0, wind: 0, tension: 0 }, app = { fire: -1, wind: -1, tension: -1 };
-  const bed = { windG: null, gustG: null, windLP: [], whG: null, whF: null, fireG: null, popBus: null, droneG: null, droneLP: null, timer: 0, popAcc: 0 };
+  let lastVolcanoBoomT = -9;
+  const tgt = { fire: 0, wind: 0, tension: 0 }, cur = { labD: 0, labH: 0, wind: 0, tension: 0 };
+  const bed = { windG: null, gustG: null, windLP: [], whG: null, whF: null, labG: null, labF: null, popBus: null, droneG: null, droneLP: null, timer: 0, popAcc: 0 };
   const mus = { nextChord: 0, chord: 0, lastNote: -1, timpAt: 0, timpN: 0 };
 
   const rnd = Math.random;
   const rr = (a, b) => a + (b - a) * rnd();
   const cl = (x, a, b) => (x < a ? a : x > b ? b : x);
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function saveCfg() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); } catch (e) {}
+  }
+  function applyMixerImmediate() {
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    if (nMaster) nMaster.gain.setTargetAtTime(cfg.master, now, 0.06);
+    if (nSfx) nSfx.gain.setTargetAtTime(cfg.sfx, now, 0.06);
+    if (nMusic) nMusic.gain.setTargetAtTime(cfg.music, now, 0.08);
+  }
+  function setCfg(key, val) {
+    if (!(key in DEFAULTS)) return;
+    cfg[key] = cl(+val || 0, 0, 1.5);
+    applyMixerImmediate();
+    saveCfg();
+  }
+  function resetCfg() {
+    Object.assign(cfg, DEFAULTS);
+    applyMixerImmediate();
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  }
 
   function gn(dest, v) { const g = ctx.createGain(); g.gain.value = v === undefined ? 0 : v; if (dest) g.connect(dest); return g; }
   function flt(dest, type, f, q) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q !== undefined) b.Q.value = q; if (dest) b.connect(dest); return b; }
@@ -147,84 +200,186 @@ const AU = (function () {
   }
 
   const S = {};
+  // --- NUOVI SUONI GATTI PURR-CRAFT (Progressione DNA Lv 1 -> 4) ---
+  const pToLvl = p => cl(Math.round(p * 3) + 1, 1, 4);
+
+  S.catClaw = (d, t) => {
+    const k = rr(0.92, 1.12);
+    const w = gn(d), wf = flt(w, 'bandpass', 2500 * k, 1.8); noi(t, 0.09, wf);
+    sw(wf.frequency, t, 1400 * k, 4600 * k, 0.06); ad(w.gain, t, 0.44, 0.004, 0.065);
+    const g = gn(d), o = osc('triangle', 460 * k, t + 0.015, 0.08, g);
+    sw(o.frequency, t + 0.015, 600 * k, 135 * k, 0.055); ad(g.gain, t + 0.015, 0.48, 0.002, 0.055);
+  };
+
+  S.catFire = (d, t, p) => {
+    const lvl = pToLvl(p);
+    const pitchMul = [0, 1.22, 1.04, 0.88, 0.74][lvl] * rr(0.96, 1.04);
+    const durL = [0, 0.14, 0.16, 0.17, 0.16][lvl];
+    const lPeak = [0, 0.44, 0.48, 0.46, 0.36][lvl];
+    const w = gn(d), wf = flt(w, 'bandpass', 850 * pitchMul, 1.1); noi(t, durL, wf, bufPink);
+    sw(wf.frequency, t, 1500 * pitchMul, 300 * pitchMul, durL * 0.85);
+    ad(w.gain, t, lPeak, 0.005, durL * 0.85);
+
+    const g = gn(d), o = osc('sine', 210 * pitchMul, t, durL, g);
+    sw(o.frequency, t, 260 * pitchMul, 68 * pitchMul, durL * 0.75);
+    ad(g.gain, t, lPeak * 0.88, 0.003, durL * 0.8);
+
+    if (lvl >= 3) {
+      const w2 = gn(d), wf2 = flt(w2, 'bandpass', 620, 1.3); noi(t + 0.035, 0.13, wf2, bufPink);
+      sw(wf2.frequency, t + 0.035, 1100, 260, 0.11);
+      ad(w2.gain, t + 0.035, lvl >= 4 ? 0.20 : 0.28, 0.005, 0.11);
+    }
+  };
+
+  S.catBoom = (d, t, p) => {
+    const lvl = pToLvl(p);
+    const dtPrev = t - lastVolcanoBoomT;
+    if (lvl >= 4) lastVolcanoBoomT = t;
+    // Anti-accumulo in raffica sul Lv 4 Vulcano
+    const rafDuck = (lvl >= 4 && dtPrev < 0.38) ? 0.68 : 1.0;
+
+    const drive  = [0, 1.1, 1.35, 1.55, 1.65][lvl];
+    const sh = shape(d, drive);
+    const expDur = [0, 0.22, 0.29, 0.35, 0.38][lvl];
+    const baseF  = [0, 135, 105, 82, 62][lvl] * rr(0.95, 1.05);
+    const ePeak  = [0, 0.52, 0.58, 0.62, 0.48][lvl] * rafDuck;
+
+    const eg = gn(sh), eo = osc('sine', baseF, t, expDur, eg);
+    sw(eo.frequency, t, baseF * 1.32, 28, expDur * 0.75);
+    ad(eg.gain, t, ePeak, 0.003, expDur * 0.82);
+
+    const bn = gn(sh), bf = flt(bn, 'lowpass', 1750 + lvl * 320, 0.8);
+    noi(t, expDur * 0.85, bf);
+    sw(bf.frequency, t, 2100 + lvl * 300, 160, expDur * 0.68);
+    ad(bn.gain, t, ePeak * 0.74, 0.002, expDur * 0.75);
+
+    if (lvl >= 2) {
+      const subPeak = [0, 0, 0.20, 0.26, 0.24][lvl] * rafDuck;
+      const rg = gn(d), rf = flt(rg, 'lowpass', 155);
+      noi(t + 0.02, expDur * 0.95, rf, bufBrown);
+      ad(rg.gain, t + 0.02, subPeak, 0.04, expDur * 0.8);
+    }
+    if (lvl >= 4) {
+      grains(d, t + 0.05, 8, 0.28, 0.11 * rafDuck, 0.008, 0.025, 900, 2800, 4, 1);
+    }
+  };
+
+  S.catLaser = (d, t, p) => {
+    const lvl = pToLvl(p);
+    const lp = flt(d, 'lowpass', 6200 + lvl * 600);
+    const dur = [0, 0.085, 0.11, 0.14, 0.18][lvl];
+    const fStart = [0, 2350, 2150, 1950, 1750][lvl] * rr(0.97, 1.03);
+    const fEnd   = [0, 680,  480,  320,  190][lvl];
+
+    const g1 = gn(lp), o1 = osc(lvl >= 3 ? 'sawtooth' : 'triangle', fStart, t, dur, g1);
+    sw(o1.frequency, t, fStart, fEnd, dur * 0.9);
+    ad(g1.gain, t, 0.36 + lvl * 0.05, 0.002, dur * 0.9);
+
+    if (lvl >= 2) {
+      const g2 = gn(lp), o2 = osc('sine', fStart * 1.5, t, dur * 0.85, g2);
+      sw(o2.frequency, t, fStart * 1.5, fEnd * 1.5, dur * 0.8);
+      ad(g2.gain, t, 0.14 + lvl * 0.04, 0.001, dur * 0.78);
+    }
+    if (lvl >= 3) {
+      const sp = gn(lp), sf = flt(sp, 'bandpass', 4200, 3.5);
+      noi(t, 0.055, sf);
+      ad(sp.gain, t, 0.16 + (lvl - 3) * 0.12, 0.001, 0.045);
+    }
+    if (lvl >= 4) {
+      const sh = shape(d, 1.6);
+      const sg = gn(sh), so = osc('sine', 145, t, 0.19, sg);
+      sw(so.frequency, t, 175, 48, 0.15);
+      ad(sg.gain, t, 0.52, 0.002, 0.16);
+    }
+  };
+
+  S.catPlasma = (d, t) => {
+    const sh = shape(d, 2.1);
+    const g = gn(sh), o = osc('sawtooth', 1050, t, 0.3, flt(g, 'lowpass', 2600, 2.2));
+    sw(o.frequency, t, 1450, 120, 0.25); ad(g.gain, t, 0.56, 0.004, 0.26);
+    const sub = gn(sh), o2 = osc('sine', 165, t, 0.35, sub);
+    sw(o2.frequency, t, 190, 42, 0.25); ad(sub.gain, t, 0.76, 0.003, 0.3);
+    grains(d, t + 0.02, 9, 0.22, 0.24, 0.005, 0.02, 2200, 5600, 4, 1);
+  };
+
+  S.catMagma = (d, t) => {
+    S.catBoom(d, t, 0.67);
+    const sp = gn(d), sf = flt(sp, 'bandpass', 3200, 3); noi(t, 0.14, sf); ad(sp.gain, t, 0.42, 0.002, 0.12);
+  };
+
+  S.catPyro = (d, t) => {
+    S.catLaser(d, t, 0.67);
+    const w = gn(d), wf = flt(w, 'bandpass', 1100, 1.5); noi(t + 0.02, 0.16, wf);
+    sw(wf.frequency, t + 0.02, 1600, 450, 0.14); ad(w.gain, t + 0.02, 0.34, 0.004, 0.14);
+  };
+
+  S.catMut = (d, t, p) => {
+    const lvl = pToLvl(p);
+    const notes = [0, 523.25, 659.25, 783.99, 1046.5];
+    const f = notes[lvl];
+    const g = gn(d), o = osc('triangle', f * 0.5, t, 0.24, g);
+    sw(o.frequency, t, f * 0.5, f, 0.14); ad(g.gain, t, 0.35, 0.01, 0.2);
+    const g2 = gn(d); osc('sine', f, t + 0.08, 0.26, g2); ad(g2.gain, t + 0.08, 0.28 + lvl * 0.04, 0.003, 0.22);
+    if (lvl === 4) {
+      const g3 = gn(d); osc('sine', f * 1.5, t + 0.12, 0.32, g3); ad(g3.gain, t + 0.12, 0.24, 0.004, 0.28);
+    }
+  };
+
+  // --- EFFETTI ORIGINALI (Mostri, Eventi, UI) ---
   S.bow = (d, t) => {
     const k = rr(0.92, 1.1);
     const g = gn(d), bp = flt(g, 'bandpass', 900 * k, 1.1);
     const o = osc('triangle', 210 * k, t, 0.2, bp); sw(o.frequency, t, 230 * k, 118 * k, 0.11);
     const o2 = osc('sawtooth', 425 * k, t, 0.12, gn(bp, 0.25)); sw(o2.frequency, t, 470 * k, 240 * k, 0.08);
     ad(g.gain, t, 0.9, 0.002, 0.14);
-    const w = gn(d), wf = flt(w, 'bandpass', 1800, 1.3); noi(t, 0.22, wf); sw(wf.frequency, t, 2400, 700, 0.18); ad(w.gain, t + 0.005, 0.22, 0.02, 0.15);
   };
   S.arrowHit = (d, t) => {
     const k = rr(0.85, 1.2);
     const g = gn(d), o = osc('sine', 170 * k, t, 0.12, g); sw(o.frequency, t, 190 * k, 70 * k, 0.07); ad(g.gain, t, 0.55, 0.002, 0.08);
     const n = gn(d), nf = flt(n, 'bandpass', 520 * k, 5); noi(t, 0.08, nf); ad(n.gain, t, 0.5, 0.001, 0.05);
-    const c = gn(d), cf = flt(c, 'highpass', 2600); noi(t, 0.04, cf); ad(c.gain, t, 0.16, 0.0005, 0.014);
   };
   S.cannon = (d, t, p) => {
     const k = rr(0.9, 1.08) * (1 - 0.18 * p), sh = shape(d, 2.2);
     const g = gn(sh), o = osc('sine', 120 * k, t, 0.9, g); sw(o.frequency, t, 125 * k, 33 * k, 0.4); ad(g.gain, t, 1.0, 0.003, 0.7);
-    const g2 = gn(sh), o2 = osc('triangle', 64 * k, t, 0.6, g2); sw(o2.frequency, t, 70 * k, 28 * k, 0.5); ad(g2.gain, t, 0.5, 0.004, 0.5);
     const b = gn(sh), bf = flt(b, 'lowpass', 1200, 0.7); noi(t, 0.7, bf); sw(bf.frequency, t, 1600, 140, 0.45); ad(b.gain, t, 0.7, 0.002, 0.5);
-    const c = gn(d), cf = flt(c, 'highpass', 1100); noi(t, 0.1, cf); ad(c.gain, t, 0.5, 0.0008, 0.05);
-    const r = gn(d), rf = flt(r, 'lowpass', 230, 0.5); noi(t + 0.05, 1.5, rf, bufBrown); ad(r.gain, t + 0.05, 0.5, 0.12, 1.2);
   };
   S.explode = (d, t, p) => {
-    const k = rr(0.88, 1.12) * (1 - 0.25 * p), L = 1 + 0.5 * p, sh = shape(d, 1.8);
-    const g = gn(sh), o = osc('sine', 90 * k, t, 0.6 * L, g); sw(o.frequency, t, 95 * k, 30 * k, 0.32 * L); ad(g.gain, t, 0.95, 0.003, 0.45 * L);
-    const b = gn(sh), bf = flt(b, 'lowpass', 2600, 0.8); noi(t, 0.7 * L, bf); sw(bf.frequency, t, 3000, 180, 0.4 * L); ad(b.gain, t, 0.75, 0.002, 0.45 * L);
-    const m = gn(d), mf = flt(m, 'bandpass', 420 * k, 0.9); noi(t, 0.5, mf); ad(m.gain, t, 0.35, 0.004, 0.3 * L);
-    grains(d, t + 0.12, 9 + ((p * 6) | 0), 0.8 * L, 0.2, 0.015, 0.05, 500, 2400, 5, 1);
-    const r = gn(d), rf = flt(r, 'lowpass', 180); noi(t + 0.05, 1.1 * L, rf, bufBrown); ad(r.gain, t + 0.05, 0.4, 0.1, 0.9 * L);
+    const k = rr(0.88, 1.12) * (1 - 0.25 * p), L = 1 + 0.4 * p, sh = shape(d, 1.7);
+    const g = gn(sh), o = osc('sine', 90 * k, t, 0.55 * L, g); sw(o.frequency, t, 95 * k, 30 * k, 0.3 * L); ad(g.gain, t, 0.85, 0.003, 0.42 * L);
+    const b = gn(sh), bf = flt(b, 'lowpass', 2500, 0.8); noi(t, 0.6 * L, bf); sw(bf.frequency, t, 2800, 180, 0.38 * L); ad(b.gain, t, 0.68, 0.002, 0.42 * L);
+    const r = gn(d), rf = flt(r, 'lowpass', 180); noi(t + 0.05, 0.9 * L, rf, bufBrown); ad(r.gain, t + 0.05, 0.35, 0.08, 0.75 * L);
   };
   S.charge = (d, t) => {
     const k = rr(0.94, 1.06), D = 0.55, lp = flt(d, 'lowpass', 3200), g = gn(lp);
     const o = osc('sine', 380 * k, t, D, g); sw(o.frequency, t, 380 * k, 1500 * k, D);
-    const o2 = osc('triangle', 572 * k, t, D, gn(g, 0.35)); sw(o2.frequency, t, 572 * k, 2270 * k, D);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.11, t + D * 0.85); g.gain.exponentialRampToValueAtTime(0.0001, t + D);
-    const n = gn(d), nf = flt(n, 'bandpass', 2000, 3); noi(t, D, nf); sw(nf.frequency, t, 1500, 5200, D);
-    n.gain.setValueAtTime(0.0001, t); n.gain.exponentialRampToValueAtTime(0.05, t + D * 0.9); n.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.02);
   };
   S.zap = (d, t, p) => {
     const k = rr(0.9, 1.1), lp = flt(d, 'lowpass', 7500);
     const c = gn(lp), cf = flt(c, 'highpass', 1700); noi(t, 0.1, cf); ad(c.gain, t, 0.8, 0.0005, 0.045);
-    const t2 = t + rr(0.03, 0.07), c2 = gn(lp), cf2 = flt(c2, 'bandpass', 2600 * k, 0.8); noi(t2, 0.12, cf2); ad(c2.gain, t2, 0.5, 0.0005, 0.07);
     const z = gn(lp, 0), zf = flt(z, 'bandpass', 2100 * k, 2.2), zo = osc('sawtooth', 96 * k, t, 0.24, zf); sw(zo.frequency, t, 130 * k, 70 * k, 0.2);
     z.gain.setValueAtTime(0, t);
     for (let i = 0; i < 9; i++) z.gain.setValueAtTime(rnd() < 0.7 ? rr(0.15, 0.4) : 0.02, t + 0.002 + i * 0.022);
     z.gain.linearRampToValueAtTime(0, t + 0.23);
-    grains(lp, t + 0.02, 10, 0.28, 0.3, 0.004, 0.014, 2800, 6000, 3, 1);
     const r = gn(d), rf = flt(r, 'lowpass', 170); noi(t, 1.0, rf, bufBrown); ad(r.gain, t + 0.01, 0.55 + 0.25 * p, 0.03, 0.8);
-    const th = gn(d), to = osc('sine', 70, t, 0.3, th); sw(to.frequency, t, 80, 38, 0.2); ad(th.gain, t, 0.45, 0.003, 0.22);
   };
   S.clash = (d, t) => {
     const f0 = rr(1500, 2300), lp = flt(d, 'lowpass', 7000);
-    const R = [1, 1.48, 2.08, 2.57, 3.31, 4.13], A = [0.3, 0.22, 0.2, 0.13, 0.09, 0.06];
-    for (let i = 0; i < 6; i++) { const g = gn(lp); osc(i % 2 ? 'sine' : 'triangle', f0 * R[i] * rr(0.995, 1.005), t, 0.4, g); ad(g.gain, t, A[i], 0.001, rr(0.2, 0.32) / (1 + i * 0.45)); }
-    const c = gn(lp), cf = flt(c, 'highpass', 3000); noi(t, 0.03, cf); ad(c.gain, t, 0.35, 0.0005, 0.012);
-    const b = gn(lp), bf = flt(b, 'bandpass', 1200, 2.5); noi(t, 0.06, bf); ad(b.gain, t, 0.35, 0.001, 0.035);
+    const R = [1, 1.48, 2.08, 2.57], A = [0.3, 0.22, 0.2, 0.13];
+    for (let i = 0; i < 4; i++) { const g = gn(lp); osc(i % 2 ? 'sine' : 'triangle', f0 * R[i], t, 0.35, g); ad(g.gain, t, A[i], 0.001, 0.24 / (1 + i * 0.4)); }
   };
   S.slash = (d, t) => {
-    const k = rr(0.85, 1.2);
-    const s = gn(d), sf = flt(s, 'bandpass', 2600, 1.5); noi(t, 0.08, sf); sw(sf.frequency, t, 1500, 4200, 0.05); ad(s.gain, t, 0.12, 0.02, 0.035);
-    const t1 = t + 0.04;
+    const k = rr(0.85, 1.2), t1 = t + 0.03;
     const c = gn(d), cf = flt(c, 'bandpass', 800 * k, 1.4); noi(t1, 0.14, cf); sw(cf.frequency, t1, 900 * k, 280 * k, 0.08); ad(c.gain, t1, 0.7, 0.002, 0.08);
-    const g = gn(d), o = osc('sine', 150 * k, t1, 0.1, g); sw(o.frequency, t1, 160 * k, 75 * k, 0.06); ad(g.gain, t1, 0.5, 0.002, 0.07);
-    const b = gn(d), bf = flt(b, 'bandpass', 1700 * k, 9); noi(t1, 0.05, bf); ad(b.gain, t1, 0.25, 0.001, 0.03);
   };
   S.ratSqueal = (d, t) => {
     const k = rr(0.85, 1.2), lp = flt(d, 'lowpass', 4800), bp = flt(lp, 'bandpass', 2700 * k, 2.5);
-    const n = rnd() < 0.4 ? 2 : 1;
-    for (let i = 0; i < n; i++) {
-      const ti = t + i * rr(0.12, 0.16), kk = k * (i ? 1.12 : 1), g = gn(bp), o = osc('sawtooth', 2100 * kk, ti, 0.16, g);
-      o.frequency.setValueAtTime(2000 * kk, ti); o.frequency.exponentialRampToValueAtTime(3100 * kk, ti + 0.04); o.frequency.exponentialRampToValueAtTime(1700 * kk, ti + 0.13);
-      osc('sine', rr(55, 85), ti, 0.16, gn(o.frequency, 220));
-      ad(g.gain, ti, i ? 0.1 : 0.16, 0.008, 0.11);
-    }
+    const g = gn(bp), o = osc('sawtooth', 2100 * k, t, 0.16, g);
+    o.frequency.setValueAtTime(2000 * k, t); o.frequency.exponentialRampToValueAtTime(3100 * k, t + 0.04); o.frequency.exponentialRampToValueAtTime(1700 * k, t + 0.13);
+    ad(g.gain, t, 0.16, 0.008, 0.11);
   };
   S.boneRattle = (d, t) => {
-    grains(d, t, 8 + ((rnd() * 4) | 0), 0.38, 0.5, 0.012, 0.04, 600, 1900, 11, 1);
-    grains(d, t + 0.02, 4, 0.3, 0.3, 0.02, 0.05, 250, 520, 8, 1);
+    grains(d, t, 8, 0.38, 0.5, 0.012, 0.04, 600, 1900, 11, 1);
     const g = gn(d), o = osc('sine', 210, t, 0.08, g); sw(o.frequency, t, 230, 130, 0.05); ad(g.gain, t, 0.3, 0.002, 0.05);
   };
   S.squelch = (d, t, p) => {
@@ -235,10 +390,6 @@ const AU = (function () {
     const b = gn(d), o = osc('sine', 170 * k, t, 0.3, b);
     o.frequency.setValueAtTime(190 * k, t); o.frequency.exponentialRampToValueAtTime(85 * k, t + 0.09); o.frequency.exponentialRampToValueAtTime(230 * k, t + 0.2);
     ad(b.gain, t, 0.4, 0.005, 0.2);
-    for (let i = 0; i < 3; i++) {
-      const ti = t + 0.1 + i * rr(0.05, 0.09), dg = gn(d), f0 = rr(420, 800) * k, q = osc('sine', f0, ti, 0.06, dg);
-      sw(q.frequency, ti, f0, f0 * 1.9, 0.035); ad(dg.gain, ti, 0.12, 0.003, 0.035);
-    }
   };
   S.batScreech = (d, t) => {
     const k = rr(0.88, 1.15), lp = flt(d, 'lowpass', 5200), bp = flt(lp, 'bandpass', 3300 * k, 3.5);
@@ -246,7 +397,6 @@ const AU = (function () {
       const ti = t + i * rr(0.06, 0.085), g = gn(bp), o = osc('square', 3600 * k, ti, 0.07, g);
       sw(o.frequency, ti, 3900 * k, 2500 * k, 0.055); ad(g.gain, ti, 0.07, 0.004, 0.05);
     }
-    const n = gn(lp), nf = flt(n, 'bandpass', 2400, 1); noi(t, 0.16, nf); ad(n.gain, t, 0.05, 0.01, 0.12);
   };
   S.roar = (d, t, p) => {
     const k = rr(0.92, 1.06) * (1 - 0.15 * p), D = 1.25;
@@ -260,17 +410,12 @@ const AU = (function () {
       const b = base[i], fr = os[i].frequency;
       fr.setValueAtTime(b * 0.85, t); fr.linearRampToValueAtTime(b * 1.3, t + 0.3); fr.linearRampToValueAtTime(b * 1.1, t + 0.7); fr.linearRampToValueAtTime(b * 0.65, t + D);
     }
-    f1.frequency.setValueAtTime(330, t); f1.frequency.linearRampToValueAtTime(640, t + 0.35); f1.frequency.linearRampToValueAtTime(420, t + D);
-    f2.frequency.setValueAtTime(900, t); f2.frequency.linearRampToValueAtTime(1300, t + 0.35); f2.frequency.linearRampToValueAtTime(950, t + D);
-    const n = gn(am, 0.12), nf = flt(n, 'bandpass', 700, 0.9); noi(t, D + 0.2, nf);
     env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(0.85, t + 0.12); env.gain.linearRampToValueAtTime(0.7, t + 0.7); env.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.15);
   };
   S.bossStep = (d, t, p) => {
     const k = rr(0.9, 1.1) * (1 - 0.2 * p), sh = shape(d, 1.6);
     const g = gn(sh), o = osc('sine', 60 * k, t, 0.5, g); sw(o.frequency, t, 66 * k, 29 * k, 0.26); ad(g.gain, t, 1.0, 0.004, 0.36);
     const n = gn(sh), nf = flt(n, 'lowpass', 150); noi(t, 0.4, nf, bufBrown); ad(n.gain, t, 0.9, 0.004, 0.25);
-    const c = gn(d), cf = flt(c, 'bandpass', 900, 0.8); noi(t + 0.015, 0.2, cf); ad(c.gain, t + 0.015, 0.1, 0.004, 0.13);
-    grains(d, t + 0.05, 4, 0.25, 0.07, 0.01, 0.03, 700, 2000, 4, 1);
   };
   S.bossDie = (d, t) => {
     const D = 1.5, k = rr(0.95, 1.05);
@@ -279,37 +424,27 @@ const AU = (function () {
     const pre = shape(f1, 2.5); pre.connect(f3);
     const src = gn(pre, 0.5), a = osc('sawtooth', 92 * k, t, D + 0.2, src), b = osc('sawtooth', 93.5 * k, t, D + 0.2, src);
     sw(a.frequency, t, 100 * k, 36 * k, D); sw(b.frequency, t, 101.6 * k, 37 * k, D);
-    f1.frequency.setValueAtTime(560, t); f1.frequency.exponentialRampToValueAtTime(230, t + D);
-    env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(0.8, t + 0.1); env.gain.linearRampToValueAtTime(0.5, t + D * 0.8); env.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.2);
+    env.gain.setValueAtTime(0.0001, t); env.gain.linearRampToValueAtTime(0.8, t + 0.1); env.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.2);
     const tc = t + 1.15, sh = shape(d, 2);
     const g = gn(sh), o = osc('sine', 75, tc, 0.9, g); sw(o.frequency, tc, 80, 24, 0.5); ad(g.gain, tc, 1.0, 0.004, 0.7);
-    const n = gn(sh), nf = flt(n, 'lowpass', 1800, 0.7); noi(tc, 0.9, nf); sw(nf.frequency, tc, 2200, 120, 0.6); ad(n.gain, tc, 0.75, 0.003, 0.6);
     grains(d, tc + 0.1, 16, 1.1, 0.28, 0.02, 0.07, 300, 1800, 5, 1);
-    const r = gn(d), rf = flt(r, 'lowpass', 140); noi(tc, 1.4, rf, bufBrown); ad(r.gain, tc, 0.6, 0.1, 1.2);
   };
   S.coin = (d, t, p) => {
     const f = 1560 * Math.pow(2, (p * 5 + rr(-0.4, 0.4)) / 12), lp = flt(d, 'lowpass', 6500);
     const g = gn(lp); osc('sine', f, t, 0.15, g); ad(g.gain, t, 0.2, 0.002, 0.09);
-    const g2 = gn(lp); osc('sine', f * 2.42, t, 0.1, g2); ad(g2.gain, t, 0.06, 0.001, 0.05);
     ding(lp, t + 0.055, f * 1.498, 0.2);
-    const c = gn(lp), cf = flt(c, 'highpass', 3500); noi(t, 0.02, cf); ad(c.gain, t, 0.06, 0.0005, 0.008);
   };
   S.hammer = (d, t, p) => {
     const k = rr(0.82, 1.22) * (1 + 0.3 * (p - 0.5));
     const n = gn(d), nf = flt(n, 'bandpass', 760 * k, 9); noi(t, 0.07, nf); ad(n.gain, t, 1.0, 0.001, 0.035);
     const g = gn(d), o = osc('sine', 200 * k, t, 0.08, g); sw(o.frequency, t, 215 * k, 140 * k, 0.05); ad(g.gain, t, 0.45, 0.001, 0.05);
-    const m = gn(d); osc('sine', 2900 * k, t, 0.06, m); ad(m.gain, t, 0.045, 0.001, 0.035);
-    const c = gn(d), cf = flt(c, 'highpass', 2200); noi(t, 0.02, cf); ad(c.gain, t, 0.12, 0.0005, 0.008);
   };
   S.buildDone = (d, t) => {
     const g = gn(d), o = osc('sine', 125, t, 0.25, g); sw(o.frequency, t, 130, 58, 0.14); ad(g.gain, t, 0.8, 0.003, 0.18);
-    const n = gn(d), nf = flt(n, 'lowpass', 600); noi(t, 0.15, nf); ad(n.gain, t, 0.5, 0.002, 0.09);
     whoomp(d, t + 0.1, 0.5, 0.5);
-    grains(d, t + 0.2, 7, 0.5, 0.12, 0.004, 0.02, 1800, 5000, 3, 1);
   };
   S.sell = (d, t) => {
     grains(d, t, 9, 0.42, 0.7, 0.03, 0.07, 280, 900, 6, 1);
-    const g = gn(d), o = osc('sine', 110, t + 0.08, 0.25, g); sw(o.frequency, t + 0.08, 120, 55, 0.15); ad(g.gain, t + 0.08, 0.6, 0.004, 0.18);
     const lp = flt(d, 'lowpass', 6500);
     for (let i = 0; i < 3; i++) ding(lp, t + 0.26 + i * 0.085, 1500 * Math.pow(2, (i * 2) / 12), 0.16);
   };
@@ -322,80 +457,68 @@ const AU = (function () {
     const f = 73.42 * rr(0.99, 1.01);
     hornNote(d, t, f, 1.25, 0.55, 0.8);
     hornNote(d, t + 1.45, f * 0.7937, 1.9, 0.6, 0.85);
-    const r = gn(d), rf = flt(r, 'lowpass', 110); noi(t + 1.45, 2.2, rf, bufBrown); ad(r.gain, t + 1.45, 0.35, 0.6, 1.5);
   };
   S.leak = (d, t) => {
     const f = 196 * rr(0.97, 1.03), lp = flt(d, 'lowpass', 1900);
-    const R = [0.5, 1, 1.19, 1.56, 2, 2.51], A = [0.35, 0.5, 0.3, 0.2, 0.14, 0.08], D = [1.3, 1.1, 0.8, 0.6, 0.45, 0.3];
-    for (let i = 0; i < 6; i++) { const g = gn(lp); osc('sine', f * R[i], t, D[i] + 0.1, g); ad(g.gain, t, A[i] * 0.6, 0.006, D[i]); }
-    const th = gn(d), tf = flt(th, 'lowpass', 300); noi(t, 0.12, tf); ad(th.gain, t, 0.4, 0.003, 0.08);
-    const fl = gn(d), am = gn(fl, 0.5), ff = flt(am, 'bandpass', 520, 0.8); noi(t, 0.75, ff); osc('sine', rr(15, 21), t, 0.75, gn(am.gain, 0.5));
-    sw(ff.frequency, t, 900, 260, 0.6); ad(fl.gain, t + 0.02, 0.4, 0.06, 0.55);
+    const R = [0.5, 1, 1.19, 1.56, 2], A = [0.35, 0.5, 0.3, 0.2, 0.14], D = [1.3, 1.1, 0.8, 0.6, 0.45];
+    for (let i = 0; i < 5; i++) { const g = gn(lp); osc('sine', f * R[i], t, D[i] + 0.1, g); ad(g.gain, t, A[i] * 0.6, 0.006, D[i]); }
   };
   S.footmanDie = (d, t) => {
     const k = rr(0.9, 1.1);
     const g = gn(d), o = osc('sine', 115 * k, t, 0.25, g); sw(o.frequency, t, 120 * k, 50 * k, 0.14); ad(g.gain, t, 0.75, 0.003, 0.17);
-    const n = gn(d), nf = flt(n, 'lowpass', 420); noi(t, 0.2, nf); ad(n.gain, t, 0.5, 0.003, 0.12);
-    grains(d, t + 0.04, 6, 0.36, 0.22, 0.02, 0.06, 1700, 3600, 10, 1);
   };
   S.uiHover = (d, t) => {
     const g = gn(d); osc('sine', rr(1250, 1400), t, 0.05, g); ad(g.gain, t, 0.07, 0.002, 0.03);
-    const c = gn(d), cf = flt(c, 'bandpass', 3000, 2); noi(t, 0.02, cf); ad(c.gain, t, 0.05, 0.0005, 0.008);
   };
   S.uiClick = (d, t) => {
     const g = gn(d), o = osc('triangle', 900, t, 0.09, g); sw(o.frequency, t, 880, 1320, 0.035); ad(g.gain, t, 0.18, 0.002, 0.06);
     const w = gn(d); osc('sine', 300, t, 0.06, w); ad(w.gain, t, 0.15, 0.001, 0.035);
-    const c = gn(d), cf = flt(c, 'bandpass', 2300, 1.5); noi(t, 0.03, cf); ad(c.gain, t, 0.2, 0.0005, 0.012);
   };
   S.uiDeny = (d, t) => {
     const lp = flt(d, 'lowpass', 700);
     for (let i = 0; i < 2; i++) {
-      const ti = t + i * 0.11, g = gn(lp); osc('triangle', i ? 128 : 158, ti, 0.1, g); osc('square', i ? 64 : 79, ti, 0.1, gn(g, 0.3));
-      g.gain.setValueAtTime(0.0001, ti); g.gain.linearRampToValueAtTime(0.3, ti + 0.008); g.gain.setValueAtTime(0.3, ti + 0.06); g.gain.linearRampToValueAtTime(0.0001, ti + 0.085);
+      const ti = t + i * 0.11, g = gn(lp); osc('triangle', i ? 128 : 158, ti, 0.1, g);
+      ad(g.gain, ti, 0.3, 0.008, 0.08);
     }
   };
   S.crumble = (d, t) => {
     const D = 3.0;
     const r = gn(d), rf = flt(r, 'lowpass', 130, 0.6); noi(t, D + 0.4, rf, bufBrown); sw(rf.frequency, t, 170, 60, D);
-    r.gain.setValueAtTime(0.0001, t); r.gain.linearRampToValueAtTime(1.0, t + 0.35); r.gain.linearRampToValueAtTime(0.7, t + D * 0.6); r.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.3);
-    const s = gn(d), o = osc('sine', 44, t, D, s); sw(o.frequency, t, 48, 30, D); ad(s.gain, t, 0.5, 0.4, D - 0.4);
-    grains(d, t + 0.1, 26, D - 0.3, 0.5, 0.05, 0.2, 180, 700, 3, 0);
-    grains(d, t + 0.2, 16, D - 0.5, 0.2, 0.01, 0.04, 800, 2600, 5, 0);
+    r.gain.setValueAtTime(0.0001, t); r.gain.linearRampToValueAtTime(1.0, t + 0.35); r.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.3);
+    grains(d, t + 0.1, 22, D - 0.3, 0.48, 0.05, 0.2, 180, 700, 3, 0);
   };
   S.rise = (d, t) => {
     const D = 3.0;
     const r = gn(d), rf = flt(r, 'lowpass', 70, 0.7); noi(t, D + 0.5, rf, bufBrown); sw(rf.frequency, t, 55, 240, D * 0.9);
     r.gain.setValueAtTime(0.0001, t); r.gain.exponentialRampToValueAtTime(0.9, t + D * 0.85); r.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.35);
-    const s = gn(d), o = osc('sine', 32, t, D + 0.2, s); sw(o.frequency, t, 30, 62, D * 0.9);
-    s.gain.setValueAtTime(0.0001, t); s.gain.exponentialRampToValueAtTime(0.45, t + D * 0.85); s.gain.exponentialRampToValueAtTime(0.0001, t + D + 0.2);
-    grains(d, t + 0.5, 14, D - 0.5, 0.55, 0.05, 0.12, 240, 720, 8, 2);
-    const tf = t + D - 0.05, g = gn(d), o2 = osc('sine', 90, tf, 0.5, g); sw(o2.frequency, tf, 95, 42, 0.25); ad(g.gain, tf, 0.9, 0.004, 0.4);
-    const n = gn(d), nf = flt(n, 'lowpass', 500); noi(tf, 0.3, nf); ad(n.gain, tf, 0.5, 0.003, 0.2);
+    grains(d, t + 0.5, 14, D - 0.5, 0.5, 0.05, 0.12, 240, 720, 8, 2);
   };
   S.beaconOut = (d, t) => {
-    const w = gn(d), am = gn(w, 0.7), wf = flt(am, 'bandpass', 2400, 1.4); noi(t, 2.0, wf); sw(wf.frequency, t, 2600, 110, 1.7);
-    osc('sine', 13, t, 2.0, gn(am.gain, 0.3));
-    w.gain.setValueAtTime(0.0001, t); w.gain.linearRampToValueAtTime(0.7, t + 0.25); w.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
     const lw = gn(d), lf = flt(lw, 'lowpass', 400); noi(t, 1.6, lf, bufBrown); sw(lf.frequency, t, 500, 70, 1.4); ad(lw.gain, t, 0.6, 0.2, 1.3);
     const td = t + 0.7, dr = gn(d), dl = flt(dr, 'lowpass', 500);
-    osc('sine', 55, td, 2.8, gn(dl, 0.6)); osc('sine', 82.6, td, 2.8, gn(dl, 0.35)); osc('triangle', 110.7, td, 2.8, gn(dl, 0.18)); osc('sine', 164.2, td, 2.8, gn(dl, 0.1));
+    osc('sine', 55, td, 2.8, gn(dl, 0.6)); osc('sine', 82.6, td, 2.8, gn(dl, 0.35));
     dr.gain.setValueAtTime(0.0001, td); dr.gain.linearRampToValueAtTime(0.5, td + 1.0); dr.gain.exponentialRampToValueAtTime(0.0001, td + 2.7);
-    const a = gn(d), af = flt(a, 'bandpass', 3200, 0.7); noi(td, 2.6, af, bufPink);
-    a.gain.setValueAtTime(0.0001, td); a.gain.linearRampToValueAtTime(0.06, td + 1.0); a.gain.exponentialRampToValueAtTime(0.0001, td + 2.6);
   };
   S.ignite = (d, t, p) => {
     whoomp(d, t, 0.75, 0.7 + 0.3 * p);
-    grains(d, t + 0.12, 12, 0.9, 0.16, 0.004, 0.02, 1800, 5200, 3, 1);
-    const r = gn(d), rf = flt(r, 'bandpass', 420, 0.7); noi(t + 0.1, 1.1, rf); ad(r.gain, t + 0.1, 0.18, 0.15, 0.85);
+    grains(d, t + 0.12, 10, 0.8, 0.14, 0.004, 0.02, 1800, 5200, 3, 1);
   };
   S.splash = (d, t) => {
     const k = rr(0.85, 1.15);
     const g = gn(d), f = flt(g, 'bandpass', 1300 * k, 0.8); noi(t, 0.4, f); sw(f.frequency, t, 900 * k, 2200 * k, 0.12); ad(g.gain, t, 0.45, 0.012, 0.28);
-    const b = gn(d), o = osc('sine', 300 * k, t, 0.1, b); sw(o.frequency, t, 320 * k, 110 * k, 0.07); ad(b.gain, t, 0.4, 0.003, 0.07);
-    grains(d, t + 0.08, 5, 0.32, 0.12, 0.006, 0.02, 2000, 4200, 6, 1);
   };
 
+  // [fn, minCooldown, reverbSend, capTier, voiceDur, baseGain, cfgGroup]
   const DEF = {
+    catClaw:   [S.catClaw,   0.045, 0.15, 1, 0.16, 0.75, 'claw'],
+    catFire:   [S.catFire,   0.055, 0.20, 1, 0.25, 0.75, 'fire'],
+    catBoom:   [S.catBoom,   0.055, 0.32, 2, 0.55, 0.80, 'fire'],
+    catLaser:  [S.catLaser,  0.045, 0.22, 1, 0.24, 0.78, 'laser'],
+    catPlasma: [S.catPlasma, 0.10,  0.38, 2, 0.45, 0.85, 'hybrid'],
+    catMagma:  [S.catMagma,  0.06,  0.35, 2, 0.55, 0.82, 'hybrid'],
+    catPyro:   [S.catPyro,   0.05,  0.26, 2, 0.30, 0.80, 'hybrid'],
+    catMut:    [S.catMut,    0.06,  0.30, 2, 0.45, 0.85, 'mut'],
+
     bow: [S.bow, 0.05, 0.18, 1, 0.3, 0.55],
     arrowHit: [S.arrowHit, 0.045, 0.12, 0, 0.15, 0.5],
     cannon: [S.cannon, 0.09, 0.45, 2, 1.6, 0.9],
@@ -404,13 +527,13 @@ const AU = (function () {
     zap: [S.zap, 0.09, 0.45, 1, 1.1, 0.7],
     clash: [S.clash, 0.06, 0.25, 1, 0.4, 0.55],
     slash: [S.slash, 0.06, 0.15, 1, 0.2, 0.55],
-    ratSqueal: [S.ratSqueal, 0.09, 0.2, 0, 0.3, 0.5],
-    boneRattle: [S.boneRattle, 0.07, 0.2, 1, 0.45, 0.6],
-    squelch: [S.squelch, 0.08, 0.2, 1, 0.45, 0.6],
-    batScreech: [S.batScreech, 0.09, 0.3, 0, 0.2, 0.5],
-    roar: [S.roar, 0.6, 0.5, 3, 1.5, 0.85],
-    bossStep: [S.bossStep, 0.12, 0.35, 2, 0.6, 0.9],
-    bossDie: [S.bossDie, 1.0, 0.5, 3, 2.6, 0.9],
+    ratSqueal: [S.ratSqueal, 0.09, 0.2, 0, 0.3, 0.5, 'monster'],
+    boneRattle: [S.boneRattle, 0.07, 0.2, 1, 0.45, 0.6, 'monster'],
+    squelch: [S.squelch, 0.08, 0.2, 1, 0.45, 0.6, 'monster'],
+    batScreech: [S.batScreech, 0.09, 0.3, 0, 0.2, 0.5, 'monster'],
+    roar: [S.roar, 0.6, 0.5, 3, 1.5, 0.85, 'monster'],
+    bossStep: [S.bossStep, 0.12, 0.35, 2, 0.6, 0.9, 'monster'],
+    bossDie: [S.bossDie, 1.0, 0.5, 3, 2.6, 0.9, 'monster'],
     coin: [S.coin, 0.035, 0.15, 0, 0.35, 0.5],
     hammer: [S.hammer, 0.05, 0.2, 0, 0.12, 0.5],
     buildDone: [S.buildDone, 0.12, 0.3, 1, 0.8, 0.65],
@@ -422,7 +545,7 @@ const AU = (function () {
     uiHover: [S.uiHover, 0.04, 0, 2, 0.06, 0.6],
     uiClick: [S.uiClick, 0.04, 0.05, 3, 0.1, 0.7],
     uiDeny: [S.uiDeny, 0.1, 0.05, 3, 0.25, 0.7],
-    crumble: [S.crumble, 1.0, 0.5, 3, 3.4, 0.9],
+    crumble: [S.crumble, 1.0, 0.5, 3, 3.4, 0.9, 'monster'],
     rise: [S.rise, 1.0, 0.5, 3, 3.5, 0.85],
     beaconOut: [S.beaconOut, 1.5, 0.6, 3, 3.6, 0.85],
     ignite: [S.ignite, 0.15, 0.35, 2, 1.2, 0.7],
@@ -435,7 +558,13 @@ const AU = (function () {
     const df = DEF[name];
     if (!df) return;
     const g = gain === undefined ? 1 : +gain;
-    if (!(g > 0.003)) return;
+    const pv = cl(+p || 0, 0, 1);
+    let mul = df[6] ? cfg[df[6]] : 1;
+    // Moltiplicatore dedicato per il Vulcano Lv 4 (sia lancio che esplosione)
+    if ((name === 'catFire' || name === 'catBoom') && pToLvl(pv) >= 4) mul *= cfg.volcano;
+    const finalG = cl(g, 0, 1.5) * df[5] * mul;
+    if (!(finalG > 0.003)) return;
+
     const now = ctx.currentTime;
     if (now - (last[name] === undefined ? -9 : last[name]) < df[1]) return;
     let c = 0;
@@ -443,40 +572,81 @@ const AU = (function () {
     if (c >= CAP[df[3]]) return;
     last[name] = now;
     const t = now + 0.006 + rnd() * 0.014;
-    const v = voice(+pan || 0, cl(g, 0, 1.5) * df[5], df[2], nSfx);
+    const v = voice(+pan || 0, finalG, df[2], nSfx);
     V = v;
-    try { df[0](v.out, t, cl(+p || 0, 0, 1)); } catch (e) {}
+    try { df[0](v.out, t, pv); } catch (e) {}
     finishVoice(v);
     ends.push(t + df[4]);
   }
 
   function startBeds() {
+    // 1. Vento opzionale (0% di default)
     bed.windG = gn(nAmb, 0); bed.windG.connect(gn(nRevIn, 0.12));
     bed.gustG = gn(bed.windG, 0.7);
-    for (let i = 0; i < 2; i++) { const lf = flt(flt(panNode(i ? 0.55 : -0.55, bed.gustG), 'highpass', 110, 0.5), 'lowpass', 420, 0.4); loopSrc(bufPink, gn(lf, 2.6), 0.8 + i * 0.13); bed.windLP.push(lf); }
+    for (let i = 0; i < 2; i++) {
+      const lf = flt(flt(panNode(i ? 0.55 : -0.55, bed.gustG), 'highpass', 110, 0.5), 'lowpass', 420, 0.4);
+      loopSrc(bufPink, gn(lf, 2.6), 0.8 + i * 0.13); bed.windLP.push(lf);
+    }
     bed.whG = gn(bed.gustG, 0); bed.whF = flt(bed.whG, 'bandpass', 800, 7); loopSrc(bufPink, gn(bed.whF, 3), 1.0);
-    bed.fireG = gn(nAmb, 0);
-    const hiss = flt(flt(gn(bed.fireG, 0.1), 'lowpass', 4500), 'highpass', 900); loopSrc(bufWhite, hiss, 1.0);
-    const roarG = gn(bed.fireG, 0.32), roarF = flt(flt(roarG, 'highpass', 75, 0.5), 'lowpass', 280, 0.5); loopSrc(bufBrown, roarF, 1.0);
-    loopOsc('sine', 6.7, gn(roarG.gain, 0.1)); loopOsc('sine', 2.3, gn(roarG.gain, 0.07));
-    bed.popBus = gn(bed.fireG, 2.0); bed.popBus.connect(gn(nRevIn, 0.1));
+
+    // 2. Dettagli Laboratorio Segreto (gocciolio, spike elettrici, bolle — zero fruscio continuo)
+    bed.popBus = gn(nAmb, cfg.labDetails);
+    bed.popBus.connect(gn(nRevIn, 0.42));
+
+    // 3. Ronzio caldo armonico Laboratorio (55Hz / 110Hz)
+    bed.labG = gn(nAmb, cfg.labHum);
+    bed.labG.connect(gn(nRevIn, 0.25));
+    bed.labF = flt(bed.labG, 'lowpass', 260, 0.8);
+    loopOsc('sine', 55.0, gn(bed.labF, 0.16));
+    loopOsc('triangle', 110.0, gn(bed.labF, 0.055));
+    loopOsc('sine', 0.18, gn(bed.labF.frequency, 45));
+
+    // 4. Drone tensione battaglia
     bed.droneG = gn(nMusic, 0); bed.droneG.connect(gn(nRevIn, 0.3));
-    bed.droneLP = flt(bed.droneG, 'lowpass', 300, 0.6);
+    bed.droneLP = flt(bed.droneG, 'lowpass', 320, 0.6);
     const dv = gn(null, 4); loopOsc('sine', 4.9, dv);
-    [[73.42, -5, 0.5], [73.42, 6, 0.5], [36.71, 0, 0.3], [110.0, 3, 0.12]].forEach((a) => { const o = loopOsc('sawtooth', a[0], gn(bed.droneLP, a[2])); o.detune.value = a[1]; dv.connect(o.detune); });
+    [[73.42, -5, 0.45], [73.42, 6, 0.45], [36.71, 0, 0.25], [110.0, 3, 0.10]].forEach((a) => {
+      const o = loopOsc('sawtooth', a[0], gn(bed.droneLP, a[2])); o.detune.value = a[1]; dv.connect(o.detune);
+    });
   }
-  function pop() {
-    const t = ctx.currentTime + rnd() * 0.08, big = rnd() < 0.12;
-    const g = gn(null, 0), f = flt(g, 'bandpass', big ? rr(500, 1100) : rr(1400, 5200), rr(1.5, 6));
-    const out = panNode(rr(-0.7, 0.7), bed.popBus); g.connect(out);
-    const s = ctx.createBufferSource(); s.buffer = bufWhite; s.connect(f);
-    const dur = big ? rr(0.025, 0.05) : rr(0.004, 0.018);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(big ? 0.5 : rr(0.12, 0.4), t + 0.0008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.start(t, rnd() * 1.8); s.stop(t + dur + 0.02);
-    s.onended = () => { try { g.disconnect(); out.disconnect(); } catch (e) {} };
+
+  function labEvent() {
+    const t = ctx.currentTime + rnd() * 0.08, pan = rr(-0.78, 0.78);
+    const v = voice(pan, 1.0, 0.35, bed.popBus); V = v;
+    const r = rnd();
+    if (r < 0.42) {
+      const f0 = rr(680, 1150), g = gn(v.out), o = osc('sine', f0, t, 0.13, g);
+      sw(o.frequency, t, f0, f0 * rr(1.75, 2.25), 0.075); ad(g.gain, t, rr(0.16, 0.28), 0.003, 0.095);
+      if (rnd() < 0.35) {
+        const t2 = t + rr(0.11, 0.22), f2 = f0 * rr(1.1, 1.35);
+        const g2 = gn(v.out), o2 = osc('sine', f2, t2, 0.1, g2);
+        sw(o2.frequency, t2, f2, f2 * 1.9, 0.06); ad(g2.gain, t2, rr(0.08, 0.15), 0.002, 0.07);
+      }
+    } else if (r < 0.76) {
+      const lp = flt(v.out, 'lowpass', 6800), nPulses = rnd() < 0.45 ? 3 : 2;
+      for (let i = 0; i < nPulses; i++) {
+        const ti = t + i * rr(0.025, 0.055), cg = gn(lp), cf = flt(cg, 'bandpass', rr(2400, 4800), 3.2);
+        noi(ti, 0.03, cf); ad(cg.gain, ti, rr(0.14, 0.28), 0.0006, rr(0.012, 0.024));
+      }
+      const zg = gn(lp), zf = flt(zg, 'bandpass', rr(1600, 2600), 5);
+      const zo = osc('sawtooth', rr(110, 165), t, 0.09, zf);
+      sw(zo.frequency, t, 150, 95, 0.08); ad(zg.gain, t, 0.14, 0.002, 0.075);
+    } else {
+      const count = 3 + ((rnd() * 3) | 0);
+      let ti = t;
+      for (let i = 0; i < count; i++) {
+        const f0 = rr(240, 460) * (1 + i * 0.08), g = gn(v.out), o = osc('sine', f0, ti, 0.08, g);
+        sw(o.frequency, ti, f0, f0 * rr(1.5, 2.0), 0.055); ad(g.gain, ti, rr(0.11, 0.22), 0.004, 0.055);
+        ti += rr(0.055, 0.11);
+      }
+    }
+    finishVoice(v);
   }
+
   function setAmbience(fire, wind, tension) {
-    tgt.fire = cl(+fire || 0, 0, 1); tgt.wind = cl(+wind || 0, 0, 1); tgt.tension = cl(+tension || 0, 0, 1);
+    tgt.fire = cl(+fire || 0, 0, 1);
+    tgt.wind = cl(+wind || 0, 0, 1);
+    tgt.tension = cl(+tension || 0, 0, 1);
   }
 
   const CH = [
@@ -508,16 +678,14 @@ const AU = (function () {
     lp.frequency.setValueAtTime(Math.min(3200, f * 5), t); lp.frequency.exponentialRampToValueAtTime(Math.max(300, f * 1.3), t + 2.2);
     const dec = 3.6 * Math.pow(440 / f, 0.35), H = [[1, 1, 1], [2.002, 0.3, 0.55], [3.006, 0.1, 0.35], [4.012, 0.04, 0.22]];
     for (let i = 0; i < H.length; i++) { const h = H[i], g = gn(lp); osc('sine', f * h[0], t, dec * h[2] + 0.1, g); ad(g.gain, t, vel * 0.11 * h[1], 0.007, dec * h[2]); }
-    const tg = gn(lp); osc('triangle', f, t, dec * 0.5, tg); ad(tg.gain, t, vel * 0.03, 0.006, dec * 0.4);
-    const n = gn(v.out), nf = flt(n, 'lowpass', 900); noi(t, 0.05, nf); ad(n.gain, t, vel * 0.03, 0.002, 0.03);
     finishVoice(v);
   }
   function timp(t, vel) {
-    const v = voice(rr(-0.15, 0.15), 1, 0.6, nMusic); V = v;
-    const g = gn(v.out), o = osc('sine', 73.4, t, 1.3, g); sw(o.frequency, t, 80, 72.5, 0.08); ad(g.gain, t, vel, 0.006, 1.1);
-    const g2 = gn(v.out); osc('sine', 110.4, t, 0.7, g2); ad(g2.gain, t, vel * 0.35, 0.005, 0.5);
-    const g3 = gn(v.out); osc('sine', 147.5, t, 0.4, g3); ad(g3.gain, t, vel * 0.15, 0.004, 0.3);
-    const n = gn(v.out), nf = flt(n, 'lowpass', 200); noi(t, 0.1, nf); ad(n.gain, t, vel * 0.6, 0.003, 0.06);
+    const v = voice(rr(-0.15, 0.15), 1, 0.65, nMusic); V = v;
+    const sh = shape(v.out, 1.4);
+    const g = gn(sh), o = osc('sine', 92.5, t, 1.25, g); sw(o.frequency, t, 118, 73.4, 0.09); ad(g.gain, t, vel * 1.35, 0.004, 1.05);
+    const g2 = gn(sh), o2 = osc('triangle', 146.8, t, 0.85, g2); sw(o2.frequency, t, 175, 110.0, 0.07); ad(g2.gain, t, vel * 0.65, 0.003, 0.7);
+    const n = gn(v.out), nf = flt(n, 'lowpass', 340); noi(t, 0.14, nf); ad(n.gain, t, vel * 0.85, 0.002, 0.09);
     finishVoice(v);
   }
   function pickNote(c) {
@@ -536,13 +704,14 @@ const AU = (function () {
       mus.nextChord = t + dur - 1.0;
       mus.chord = c.to[(rnd() * c.to.length) | 0];
     }
-    if (cur.tension > 0.12) {
+    if (cur.tension > 0.08) {
       if (mus.timpAt < now - 1) mus.timpAt = now + 0.4;
       if (now > mus.timpAt - 0.2) {
-        const t = Math.max(mus.timpAt, now + 0.03), vel = 0.22 * cur.tension;
-        timp(t, vel * (mus.timpN % 4 === 0 ? 1 : 0.7));
-        if (mus.timpN % 4 === 3) timp(t + 1.8, vel * 0.45);
-        mus.timpN++; mus.timpAt = t + 2.4;
+        const t = Math.max(mus.timpAt, now + 0.03);
+        const vel = (0.28 + 0.45 * cur.tension) * (mus.timpN % 4 === 0 ? 1.15 : 0.85);
+        timp(t, vel);
+        if (cur.tension > 0.45 && mus.timpN % 2 === 1) timp(t + 0.38, vel * 0.68);
+        mus.timpN++; mus.timpAt = t + Math.max(1.15, 2.1 - cur.tension * 0.9);
       }
     }
   }
@@ -554,15 +723,17 @@ const AU = (function () {
     lim.threshold.value = -8; lim.knee.value = 4; lim.ratio.value = 16; lim.attack.value = 0.002; lim.release.value = 0.18;
     lim.connect(ctx.destination);
     const sh = (dest, type, f, g, q) => { const b = flt(dest, type, f, q); b.gain.value = g; return b; };
-    nMaster = gn(sh(sh(sh(flt(flt(lim, 'highpass', 32, 0.7), 'highpass', 32, 0.7), 'highshelf', 3000, 6), 'peaking', 1200, 3, 0.7), 'lowshelf', 180, -10), 0); nMaster.gain.setValueAtTime(0.0001, ctx.currentTime); nMaster.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.6);
+    nMaster = gn(sh(sh(sh(flt(flt(lim, 'highpass', 32, 0.7), 'highpass', 32, 0.7), 'highshelf', 3000, 1.5), 'peaking', 1200, 1.0, 0.7), 'lowshelf', 180, -8), 0);
+    nMaster.gain.setValueAtTime(0.0001, ctx.currentTime);
+    nMaster.gain.linearRampToValueAtTime(cfg.master, ctx.currentTime + 0.6);
     nMute = gn(nMaster, api.muted ? 0 : 1);
-    nSfx = gn(nMute, 1); nAmb = gn(nMute, 0.9); nMusic = gn(nMute, 0.5);
+    nSfx = gn(nMute, cfg.sfx); nAmb = gn(nMute, 0.9); nMusic = gn(nMute, cfg.music);
     makeBuffers();
     const conv = ctx.createConvolver(); conv.buffer = makeImpulse();
-    conv.connect(gn(nMute, 0.5));
+    conv.connect(gn(nMute, 0.45));
     nRevIn = gn(null, 1); nRevIn.connect(flt(conv, 'highpass', 120));
     startBeds();
-    mus.nextChord = ctx.currentTime + 1.5; mus.chord = 0;
+    mus.nextChord = ctx.currentTime + 1.2; mus.chord = 0;
   }
   function unlock() {
     if (!ctx) {
@@ -585,37 +756,233 @@ const AU = (function () {
     api.muted = !!b;
     if (ctx && nMute) nMute.gain.setTargetAtTime(api.muted ? 0 : 1, ctx.currentTime, 0.06);
   }
-  function setP(key, param, v, now) { if (Math.abs(v - app[key]) > 0.004) { app[key] = v; param.setTargetAtTime(v, now, 0.12); } }
+
   function update(dt) {
     if (!ctx) return;
     sync();
     if (!api.ready) return;
     dt = cl(+dt || 0.016, 0, 0.1);
-    const now = ctx.currentTime, k = 1 - Math.exp(-dt * 2.5);
-    cur.fire += (tgt.fire - cur.fire) * k; cur.wind += (tgt.wind - cur.wind) * k; cur.tension += (tgt.tension - cur.tension) * k;
-    setP('fire', bed.fireG.gain, cur.fire, now);
-    setP('wind', bed.windG.gain, cur.wind, now);
-    if (Math.abs(cur.tension - app.tension) > 0.004) {
-      app.tension = cur.tension;
-      bed.droneG.gain.setTargetAtTime(cur.tension * 0.1, now, 0.3);
-      bed.droneLP.frequency.setTargetAtTime(280 + 220 * cur.tension, now, 0.3);
-      nMusic.gain.setTargetAtTime(0.5 + 0.15 * cur.tension, now, 0.3);
+    const now = ctx.currentTime, k = 1 - Math.exp(-dt * 3.0);
+
+    const wantTens = cl(cfg.tensionBase + tgt.tension * (1 - cfg.tensionBase), 0, 1);
+    cur.labD += (cfg.labDetails - cur.labD) * k;
+    cur.labH += (cfg.labHum - cur.labH) * k;
+    cur.wind += (cfg.wind - cur.wind) * k;
+    cur.tension += (wantTens - cur.tension) * k;
+
+    bed.popBus.gain.setTargetAtTime(cur.labD, now, 0.1);
+    bed.labG.gain.setTargetAtTime(cur.labH, now, 0.1);
+    bed.windG.gain.setTargetAtTime(cur.wind, now, 0.1);
+    bed.droneG.gain.setTargetAtTime(cur.tension * 0.32, now, 0.15);
+    bed.droneLP.frequency.setTargetAtTime(320 + 460 * cur.tension, now, 0.15);
+    nMusic.gain.setTargetAtTime(cfg.music * (1 + 0.18 * tgt.tension), now, 0.25);
+
+    if (cur.wind > 0.01) {
+      bed.timer -= dt;
+      if (bed.timer <= 0) {
+        bed.timer = rr(2, 5);
+        const tc = rr(1.2, 3), f = rr(200, 520) * (0.7 + 0.6 * cur.wind);
+        for (let i = 0; i < bed.windLP.length; i++) bed.windLP[i].frequency.setTargetAtTime(f * rr(0.85, 1.15), now, tc);
+        bed.gustG.gain.setTargetAtTime(rr(0.45, 1.0), now, tc);
+        const w = rnd(); bed.whG.gain.setTargetAtTime(w * w * 0.3, now, tc); bed.whF.frequency.setTargetAtTime(rr(600, 1100), now, tc);
+      }
     }
-    bed.timer -= dt;
-    if (bed.timer <= 0) {
-      bed.timer = rr(2, 5);
-      const tc = rr(1.2, 3), f = rr(200, 520) * (0.7 + 0.6 * cur.wind);
-      for (let i = 0; i < bed.windLP.length; i++) bed.windLP[i].frequency.setTargetAtTime(f * rr(0.85, 1.15), now, tc);
-      bed.gustG.gain.setTargetAtTime(rr(0.45, 1.0), now, tc);
-      const w = rnd(); bed.whG.gain.setTargetAtTime(w * w * 0.3, now, tc); bed.whF.frequency.setTargetAtTime(rr(600, 1100), now, tc);
-    }
-    if (cur.fire > 0.02) {
-      bed.popAcc += dt * (1.5 + 13 * cur.fire);
-      let n = 0;
-      while (bed.popAcc >= 1 && n++ < 4) { bed.popAcc -= rr(0.5, 1.5); pop(); }
-      if (bed.popAcc > 4) bed.popAcc = 0;
+    if (cur.labD > 0.02) {
+      bed.popAcc += dt * (0.25 + 1.35 * cur.labD);
+      if (bed.popAcc >= 1) { bed.popAcc -= rr(0.85, 1.45); labEvent(); }
     }
     musicTick(now);
+  }
+
+  // --- PANNELLO DEBUG IN-GAME (#debug / #audio o tasto F9 / Alt+A) ---
+  let dbgEl = null, dbgMini = false, dbgSim = null;
+  function stopDbgSim() { if (dbgSim) { clearInterval(dbgSim); dbgSim = null; } }
+
+  function buildDebugPanel() {
+    if (dbgEl || typeof document === 'undefined') return;
+    const st = document.createElement('style');
+    st.textContent = `
+      #pc-aud-dbg {
+        position: fixed; top: 54px; right: 12px; width: 312px; max-height: calc(100vh - 70px);
+        overflow-y: auto; z-index: 9999; background: rgba(11, 17, 28, 0.95);
+        border: 1px solid #38bdf8; border-radius: 10px; padding: 10px 12px;
+        color: #e6edf3; font: 11.5px/1.35 system-ui, -apple-system, sans-serif;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.65); user-select: none;
+      }
+      #pc-aud-dbg.mini { width: auto; padding: 6px 10px; overflow: hidden; }
+      #pc-aud-dbg.mini .dbg-body { display: none; }
+      #pc-aud-dbg .dbg-hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      #pc-aud-dbg .dbg-title { font-weight: 700; color: #7dd3fc; font-size: 12px; }
+      #pc-aud-dbg .dbg-hbtns { display: flex; gap: 4px; }
+      #pc-aud-dbg button {
+        background: #1e293b; color: #e2e8f0; border: 1px solid #3b5273;
+        border-radius: 5px; padding: 4px 7px; font-size: 10.5px; font-weight: 600; cursor: pointer;
+      }
+      #pc-aud-dbg button:hover { background: #2d3f59; border-color: #60a5fa; }
+      #pc-aud-dbg button.ok { background: #143628; border-color: #22c55e; color: #86efac; }
+      #pc-aud-dbg .sec { margin-top: 8px; padding-top: 6px; border-top: 1px solid #1e2d42; font-weight: 700; color: #fbbf24; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; }
+      #pc-aud-dbg .r { margin-top: 5px; }
+      #pc-aud-dbg .r label { display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; }
+      #pc-aud-dbg .r label b { color: #fff; }
+      #pc-aud-dbg input[type="range"] { width: 100%; height: 14px; accent-color: #38bdf8; cursor: pointer; margin-top: 1px; }
+      #pc-aud-dbg .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+      #pc-aud-dbg .fbar { display: flex; gap: 5px; margin-top: 8px; padding-top: 7px; border-top: 1px solid #1e2d42; }
+      #pc-aud-dbg .fbar button { flex: 1; padding: 5px 6px; }
+    `;
+    document.head.appendChild(st);
+
+    const rowsAmb = [
+      ['master',      'Master', 100],
+      ['music',       'Musica (Synth/Piano)', 100],
+      ['labDetails',  'Dettagli Lab (gocce/archi)', 100],
+      ['labHum',      'Ronzio Lab (55Hz)', 100],
+      ['tensionBase', 'Tensione Base (timpani)', 100],
+      ['wind',        'Vento (fruscio)', 100],
+    ];
+    const rowsCat = [
+      ['sfx',     'SFX Globali', 150],
+      ['claw',    'Gatto Base (Graffio)', 150],
+      ['fire',    'Gatto Fuoco (Lv 1-3)', 150],
+      ['volcano', 'Vulcano Lv 4 (Raffica)', 150],
+      ['laser',   'Gatto Laser (Lv 1-4)', 150],
+      ['hybrid',  'Ibridi 4 DNA (Plasma ecc.)', 150],
+      ['mut',     'Iniezione Fiala DNA', 150],
+      ['monster', 'Mostri & Boss', 150],
+    ];
+
+    const mkRows = arr => arr.map(([k, lbl, max]) => `
+      <div class="r">
+        <label><span>${lbl}</span><b id="auv-${k}">${Math.round(cfg[k] * 100)}%</b></label>
+        <input type="range" min="0" max="${max}" value="${Math.round(cfg[k] * 100)}" data-auk="${k}" />
+      </div>`).join('');
+
+    dbgEl = document.createElement('div');
+    dbgEl.id = 'pc-aud-dbg';
+    dbgEl.innerHTML = `
+      <div class="dbg-hd">
+        <span class="dbg-title">🎛️ Audio Debug [F9]</span>
+        <div class="dbg-hbtns">
+          <button id="au-mini" title="Minimizza">—</button>
+          <button id="au-close" title="Chiudi (F9)">✕</button>
+        </div>
+      </div>
+      <div class="dbg-body">
+        <div class="sec">Sottofondo Laboratorio</div>
+        ${mkRows(rowsAmb)}
+        <div class="sec">Volumi Gatti &amp; SFX</div>
+        ${mkRows(rowsCat)}
+        <div class="sec">Test Rapido (anche in pausa)</div>
+        <div class="tgrid">
+          <button data-aut="f1">Fuoco Lv1</button>
+          <button data-aut="f4">Vulcano Lv4</button>
+          <button data-aut="raf4">Raffica Lv4</button>
+          <button data-aut="l1">Laser Lv1</button>
+          <button data-aut="l4">Cyborg Lv4</button>
+          <button data-aut="pl">Plasma 2x2</button>
+        </div>
+        <div class="fbar">
+          <button id="au-copy">Copia Config</button>
+          <button id="au-reset">Reset Default</button>
+        </div>
+      </div>
+    `;
+
+    // Isola completamente gli input dal canvas / hud.js su window
+    const stopProp = e => e.stopPropagation();
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'wheel', 'touchstart', 'touchmove', 'touchend', 'click', 'dblclick', 'contextmenu', 'keydown', 'keyup'].forEach(ev => {
+      dbgEl.addEventListener(ev, stopProp, { passive: false });
+    });
+
+    document.body.appendChild(dbgEl);
+
+    const syncUI = () => {
+      dbgEl.querySelectorAll('input[data-auk]').forEach(inp => {
+        const k = inp.dataset.auk, pct = Math.round(cfg[k] * 100);
+        inp.value = pct;
+        const b = document.getElementById('auv-' + k);
+        if (b) b.textContent = pct + '%';
+      });
+    };
+
+    dbgEl.querySelectorAll('input[data-auk]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        unlock();
+        const k = inp.dataset.auk, v = +inp.value / 100;
+        setCfg(k, v);
+        const b = document.getElementById('auv-' + k);
+        if (b) b.textContent = inp.value + '%';
+      });
+    });
+
+    document.getElementById('au-mini').onclick = () => {
+      dbgMini = !dbgMini;
+      dbgEl.classList.toggle('mini', dbgMini);
+      document.getElementById('au-mini').textContent = dbgMini ? '+' : '—';
+    };
+    document.getElementById('au-close').onclick = () => toggleDebug(false);
+
+    dbgEl.querySelectorAll('[data-aut]').forEach(btn => {
+      btn.onclick = () => {
+        unlock();
+        const act = btn.dataset.aut;
+        if (act === 'raf4') {
+          if (dbgSim) { stopDbgSim(); btn.classList.remove('ok'); return; }
+          btn.classList.add('ok');
+          const fireOne = () => { play('catFire', 0, 0.75, 1); setTimeout(() => play('catBoom', 0, 0.78, 1), 220); };
+          fireOne();
+          dbgSim = setInterval(fireOne, 290);
+          return;
+        }
+        stopDbgSim();
+        dbgEl.querySelectorAll('[data-aut="raf4"]').forEach(b => b.classList.remove('ok'));
+        if (act === 'f1') { play('catFire', 0, 0.75, 0); setTimeout(() => play('catBoom', 0, 0.78, 0), 220); }
+        else if (act === 'f4') { play('catFire', 0, 0.75, 1); setTimeout(() => play('catBoom', 0, 0.78, 1), 220); }
+        else if (act === 'l1') play('catLaser', 0, 0.78, 0);
+        else if (act === 'l4') play('catLaser', 0, 0.78, 1);
+        else if (act === 'pl') play('catPlasma', 0, 0.85, 0.5);
+      };
+    });
+
+    document.getElementById('au-reset').onclick = () => { stopDbgSim(); resetCfg(); syncUI(); };
+    document.getElementById('au-copy').onclick = () => {
+      const out = {};
+      for (const k in DEFAULTS) out[k] = Math.round(cfg[k] * 100) / 100;
+      const txt = JSON.stringify(out, null, 2);
+      const copyBtn = document.getElementById('au-copy');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(() => {
+          copyBtn.textContent = 'Copiato!'; copyBtn.classList.add('ok');
+          setTimeout(() => { copyBtn.textContent = 'Copia Config'; copyBtn.classList.remove('ok'); }, 1400);
+        });
+      } else {
+        window.prompt('Copia configurazione audio:', txt);
+      }
+    };
+  }
+
+  function toggleDebug(force) {
+    if (!dbgEl) buildDebugPanel();
+    if (!dbgEl) return;
+    const show = force !== undefined ? !!force : (dbgEl.style.display === 'none');
+    dbgEl.style.display = show ? 'block' : 'none';
+    if (!show) stopDbgSim();
+  }
+
+  if (typeof window !== 'undefined') {
+    const checkHash = () => {
+      const h = (location.hash || '') + (location.search || '');
+      if (/debug|audio/i.test(h)) toggleDebug(true);
+    };
+    window.addEventListener('DOMContentLoaded', checkHash);
+    window.addEventListener('load', checkHash);
+    window.addEventListener('hashchange', checkHash);
+    window.addEventListener('keydown', e => {
+      if (e.code === 'F9' || (e.altKey && e.code === 'KeyA')) {
+        e.preventDefault();
+        if (!dbgEl) { buildDebugPanel(); dbgEl.style.display = 'block'; }
+        else toggleDebug();
+      }
+    });
   }
 
   return api;

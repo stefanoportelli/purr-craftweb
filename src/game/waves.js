@@ -22,7 +22,10 @@ function waveMenu(k, level) {
 }
 function bossType() { return 'amalgama'; }
 function buildWave(k, level) {
-  const q = [], hpMul = (1 + .12 * (k - 1)) * (1 + .25 * level) * (.85 + .15 * G.press);
+  const C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
+  const wMul = C ? C.waveHpMul : 1;
+  const pressFactor = (C && !C.useDynamicPress) ? 1 : ((1 + .12 * (k - 1)) * (.85 + .15 * G.press));
+  const q = [], hpMul = wMul * (1 + .25 * level) * pressFactor;
   let t = .6;
   const addGroup = (type, count, gap) => {
     for (let i = 0; i < count; i++) { q.push({ t, type, hpMul }); t += gap * rr(.85, 1.15); }
@@ -30,28 +33,36 @@ function buildWave(k, level) {
   };
   const mult = 1 + Math.floor(level * .5);
   if (k === 1) {
-    addGroup('polipetto', 8 * mult, .32);
-    addGroup('polipetto', 12 * mult, .26);
+    const tot = Math.round((C ? C.w1Poli : 20) * mult), n1 = Math.floor(tot * .4);
+    addGroup('polipetto', n1, .32);
+    addGroup('polipetto', tot - n1, .26);
   } else if (k === 2) {
-    addGroup('polipetto', 10 * mult, .28);
-    addGroup('abominio', 2 + (level > 0 ? 1 : 0), 1.6);
-    addGroup('polipetto', 12 * mult, .24);
+    const tot = Math.round((C ? C.w2Poli : 22) * mult), n1 = Math.floor(tot * .45);
+    const nAb = Math.round(C ? C.w2Abom : 3) + (level > 0 ? 1 : 0);
+    addGroup('polipetto', n1, .28);
+    addGroup('abominio', nAb, 1.6);
+    addGroup('polipetto', tot - n1, .24);
   } else if (k === 3) {
-    addGroup('polipetto', 10 * mult, .28);
-    addGroup('tentacolo', 6 * mult, .42);
-    addGroup('polipetto', 8 * mult, .26);
-    addGroup('tentacolo', 8 * mult, .38);
+    const totP = Math.round((C ? C.w3Poli : 18) * mult), p1 = Math.floor(totP * .55);
+    const totT = Math.round((C ? C.w3Tent : 14) * mult), t1 = Math.floor(totT * .43);
+    addGroup('polipetto', p1, .28);
+    addGroup('tentacolo', t1, .42);
+    addGroup('polipetto', totP - p1, .26);
+    addGroup('tentacolo', totT - t1, .38);
   } else if (k === 4) {
-    addGroup('polipetto', 12 * mult, .25);
-    addGroup('abominio', 2 + (level > 0 ? 1 : 0), 1.4);
-    addGroup('tentacolo', 8 * mult, .38);
-    addGroup('polipetto', 16 * mult, .22);
-    addGroup('abominio', 2, 1.3);
+    const totP = Math.round((C ? C.w4Poli : 28) * mult), p1 = Math.floor(totP * .43);
+    const totA = Math.round(C ? C.w4Abom : 4) + (level > 0 ? 1 : 0), a1 = Math.floor(totA * .5);
+    const totT = Math.round((C ? C.w4Tent : 12) * mult);
+    addGroup('polipetto', p1, .25);
+    addGroup('abominio', a1, 1.4);
+    addGroup('tentacolo', totT, .38);
+    addGroup('polipetto', totP - p1, .22);
+    addGroup('abominio', totA - a1, 1.3);
   } else {
-    q.push({ t: 2.0, type: 'amalgama', hpMul: (1 + .38 * level) * Math.pow(G.press, .4) });
+    q.push({ t: 2.0, type: 'amalgama', hpMul: wMul * (1 + .38 * level) * ((C && !C.useDynamicPress) ? 1 : Math.pow(G.press, .4)) });
     t = 4.5;
-    addGroup('polipetto', 12 * mult, .26);
-    addGroup('tentacolo', 6 * mult, .4);
+    addGroup('polipetto', Math.round((C ? C.w5Poli : 16) * mult), .26);
+    addGroup('tentacolo', Math.round((C ? C.w5Tent : 10) * mult), .4);
   }
   q.sort((a, b) => a.t - b.t);
   return q;
@@ -63,14 +74,24 @@ function startWave() {
   UI.banner(G.bossWave ? 'Wave ' + waveNumber() + ' · ' + MON[bossType()].name : 'Wave ' + waveNumber(), G.bossWave ? 3.6 : 2.2, G.bossWave);
 }
 function endWave() {
-  const l = G.waveLeaks;
-  if (l === 0) G.press *= 1.17; else if (l >= 6) G.press *= .8; else if (l >= 3) G.press *= .9;
-  if (G.lives <= 6) G.press *= .9;
-  G.press = clamp(G.press, .6, 2.2);
-  G.gold += 24 + 9 * G.k + 10 * G.level;
+  const C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
+  if (!C || C.useDynamicPress) {
+    const l = G.waveLeaks;
+    if (l === 0) G.press *= 1.17; else if (l >= 6) G.press *= .8; else if (l >= 3) G.press *= .9;
+    if (G.lives <= G.maxLives * .3) G.press *= .9;
+    G.press = clamp(G.press, .6, 2.2);
+  } else G.press = 1;
+  const bonus = C ? Math.round(C.waveClearBonus) : 0;
+  if (bonus > 0) G.gold += bonus;
 }
 function updateWaves(dt) {
   if (G.phase !== 'play') return;
+  const C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
+  const regen = C ? C.dnaPerSec : 2.0;
+  if (regen > 0) {
+    G.dnaAcc = (G.dnaAcc || 0) + dt * regen;
+    if (G.dnaAcc >= 1) { const add = Math.floor(G.dnaAcc); G.dnaAcc -= add; G.gold += add; }
+  }
   if (G.spawning) {
     G.waveT += dt;
     while (G.queue.length && G.queue[0].t <= G.waveT) {
@@ -93,7 +114,7 @@ function updateWaves(dt) {
   }
   if (G.lives <= 0 && G.phase === 'play') setPhase('defeat');
 }
-function callWaveEarly() { if (G.phase === 'play' && !G.spawning && !G.bossWave && G.nextIn > .4) { G.gold += Math.round(G.nextIn * 3); G.nextIn = .05; return true; } return false; }
+function callWaveEarly() { if (G.phase === 'play' && !G.spawning && !G.bossWave && G.nextIn > .4) { const r = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg.earlyCallRate : 2; G.gold += Math.round(G.nextIn * r); G.nextIn = .05; return true; } return false; }
 
 function padCoverage(pad, range) {
   const B = G.B; let c = 0; const r2 = range * range;
@@ -115,7 +136,8 @@ function mutateTower(t, elem, byPlayer) {
 function upgradeTower(t, byPlayer) { return mutateTower(t, 'fire', byPlayer); }
 function sellTower(t) {
   if (!t || !t.alive || G.phase !== 'play') return false;
-  const refund = Math.floor(t.spent * .5);
+  const refRate = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg.sellRefund : .5;
+  const refund = Math.floor(t.spent * refRate);
   G.gold += refund; t.sell(); const i = G.towers.indexOf(t); if (i >= 0) G.towers.splice(i, 1); return true;
 }
 
@@ -205,9 +227,18 @@ function activateBoard(B, lit) {
   G.padCov = null;
 }
 function beginBattle(first) {
-  const B = G.B;
-  G.lives = G.maxLives; G.gold = 300 + 80 * G.level; G.bountyMul = 1 + .18 * G.level; G.dmgMul = 1.55 + .2 * G.level; G.press = lerp(G.press, 1, .5); UI.goldShown = G.gold; G.k = 0; G.leaks = 0; G.leakTypes = {}; G.spawning = false; G.bossWave = false; G.nextIn = first ? .9 : 1.6; G.queue = []; AI.think = .15; AI.wait = 0;
-  const n = 4 + Math.min(3, G.level);
+  const B = G.B, C = (typeof BAL !== 'undefined' && BAL.cfg) ? BAL.cfg : null;
+  if (typeof BAL !== 'undefined') BAL.sync(false);
+  G.maxLives = C ? Math.max(1, Math.round(C.baseHp)) : 100;
+  G.lives = G.maxLives;
+  G.gold = (C ? Math.round(C.startDna) : 100) + 50 * G.level;
+  G.dnaAcc = 0;
+  G.bountyMul = 1 + .15 * G.level;
+  G.dmgMul = 1 + .15 * G.level;
+  G.press = (C && !C.useDynamicPress) ? 1 : lerp(G.press, 1, .5);
+  UI.goldShown = G.gold; G.k = 0; G.leaks = 0; G.leakTypes = {}; G.spawning = false; G.bossWave = false;
+  G.nextIn = first ? .9 : 1.6; G.queue = []; AI.think = .15; AI.wait = 0;
+  const n = C ? Math.round(C.preSpawnCount) : 0;
   for (let i = 0; i < n; i++) spawnMonster('polipetto', { s: B.cave.s + 2.2 + i * 1.15, lat: rr(-.7, .7), hpMul: 1 + .22 * G.level });
   G.phase = 'play'; G.phaseT = 0;
 }

@@ -1,11 +1,12 @@
 'use strict';
 
 const MON = {
-  polipetto: { name: 'Polipetto di Melma', tip: 'Unita veloce da sciame. Debole contro i colpi ad area.', hp: 28, spd: 1.9, rad: .24, mass: .6, bounty: 5, lives: 1, hitH: .25, top: .55, dmg: 5, atkT: .8, eye: [1.8, 3.4, .5], scale: 1.05, death: 'goo', cat: 'swarm' },
-  abominio: { name: 'Abominio di Roccia', tip: 'Corazzato e lento. Assorbe i colpi proteggendo lo sciame.', hp: 240, spd: .85, rad: .48, mass: 8, bounty: 22, lives: 2, hitH: 1.0, top: 2.0, dmg: 15, atkT: 1.4, eye: [1.6, 3.4, .6], scale: 1.45, armor: .45, slowRes: .35, death: 'rock', cat: 'armor' },
-  tentacolo: { name: 'Tentacolo Alato', tip: 'Sorvola la strada ignorando i blocchi a terra.', hp: 55, spd: 1.65, rad: .26, mass: .5, bounty: 12, lives: 1, hitH: 0, top: .45, dmg: 10, atkT: 1, eye: [2.2, 3.4, .5], scale: 1.15, fly: true, death: 'bat', cat: 'air', alt: [2.5, 3.3], flap: 13 },
-  amalgama: { name: 'Amalgama Infetta', tip: 'Boss: alla morte genera 4 Polipetti e disattiva una torre.', hp: 1500, spd: .62, rad: .98, mass: 55, bounty: 150, lives: 5, hitH: 1.5, top: 2.9, dmg: 50, atkT: 1.7, eye: [2.2, 3.8, .5], scale: 2.3, boss: true, death: 'goo', cat: 'armor' },
+  polipetto: { name: 'Polipetto di Melma', tip: 'Unita veloce da sciame. Debole contro i colpi ad area.', hp: 50, spd: 1.9, rad: .24, mass: .6, bounty: 4, lives: 5, hitH: .25, top: .55, dmg: 5, atkT: .8, eye: [1.8, 3.4, .5], scale: 1.05, death: 'goo', cat: 'swarm' },
+  abominio: { name: 'Abominio di Roccia', tip: 'Corazzato e lento. Assorbe i graffi fisici, debole al Fuoco.', hp: 350, spd: .85, rad: .48, mass: 8, bounty: 20, lives: 15, hitH: 1.0, top: 2.0, dmg: 15, atkT: 1.4, eye: [1.6, 3.4, .6], scale: 1.45, armor: .6, slowRes: .35, death: 'rock', cat: 'armor' },
+  tentacolo: { name: 'Tentacolo Alato', tip: 'Sorvola la strada: colpisci con il Gatto Laser.', hp: 120, spd: 1.65, rad: .26, mass: .5, bounty: 10, lives: 10, hitH: 0, top: .45, dmg: 10, atkT: 1, eye: [2.2, 3.4, .5], scale: 1.15, fly: true, death: 'bat', cat: 'air', alt: [2.5, 3.3], flap: 13 },
+  amalgama: { name: 'Amalgama Infetta', tip: 'Boss: alla morte genera 4 Polipetti e disattiva un gatto.', hp: 3000, spd: .62, rad: .98, mass: 55, bounty: 150, lives: 100, hitH: 1.5, top: 2.9, dmg: 50, atkT: 1.7, eye: [2.2, 3.8, .5], scale: 2.3, boss: true, death: 'goo', cat: 'armor' },
 };
+if (typeof BAL !== 'undefined') BAL.sync(false);
 
 function spawnMonster(type, o = {}) {
   const B = G.B, def = MON[type], hpMul = o.hpMul || 1, bt = B.bio.tints;
@@ -34,7 +35,7 @@ function slowMonster(m, f, t) { if (m.def.boss) { f *= .4; t *= .6; } if (m.def.
 function hitMonster(m, dmg, kind, dx, dz, tower) {
   if (m.dead || m.hp <= 0) return false;
   if (m.eth) { if (kind === 'arrow' || kind === 'sword') { if (rnd() < .5) fxTimed(0, m.x + rr(-.2, .2), m.y + m.hitH + rr(-.2, .3), m.z + rr(-.2, .2), .5, .5, .5, .9, 1.8, .7, .18); return false; } dmg *= .5; }
-  if (kind === 'arrow' && m.def.armor) { dmg *= m.def.armor; if (rnd() < .6) { fxSparks(m.x, m.y + m.hitH, m.z, 3, 3, 2.4, 2.2, 1.6, { size: .05 }); } }
+  if ((kind === 'arrow' || kind === 'claw') && m.def.armor) { dmg *= m.def.armor; if (rnd() < .6) { fxSparks(m.x, m.y + m.hitH, m.z, 3, 3, 2.4, 2.2, 1.6, { size: .05 }); } }
   m.hp -= dmg; m.flash = 1; m.flinch = m.def.boss ? Math.max(m.flinch, .25) : 1; m.hitAt = G.t;
   const kb = (kind === 'blast' ? 2.6 : kind === 'sword' ? 1.3 : kind === 'arrow' ? .7 : .2) / Math.sqrt(m.mass);
   if (!m.fly && (dx || dz)) { const p = pathAt(G.B, m.s, _ap); m.ks += (dx * p.tx + dz * p.tz) * kb; m.kl += (-dx * p.tz + dz * p.tx) * kb; }

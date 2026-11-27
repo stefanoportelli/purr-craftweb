@@ -88,7 +88,7 @@ function step(rdt) {
     for (const m of G.mons) drawMonster(m, G.t);
     for (const f of G.men) if (!f.dead) drawFootman(f);
     if (G.phase === 'play') {
-      const k0 = (G.gold >= 70 ? 1 : .5) * (UI.manual ? 1.25 : 1);
+      const k0 = (G.gold >= DNA_COSTS[0] ? 1 : .5) * (UI.manual ? 1.25 : 1);
       for (let i = 0; i < B.pads.length; i++) {
         const p = B.pads[i]; if (p.tower) continue;
         _mm.compose(_mv.set(p.x, p.y, p.z), _mq.setFromAxisAngle(_upv, p.face + Math.sin(G.t * 1.3 + i * 2.1) * .3), _ms); KIT.marker.put(_mm, 0, null);
@@ -123,12 +123,51 @@ function step(rdt) {
   if (AU.ready) { let lit = 0; for (const t of G.towers) if (t.alive && t.em.on > .5 && t.kind !== 'spire') lit++; AU.setAmbience(sat((.3 + lit * .06) * LT.beaconOn + .05), sat((G.phase === 'play' ? .5 : .85) * B.bio.wind), G.bossAlive && G.phase === 'play' ? 1 : 0); AU.update(rdt); }
 }
 
+function stepPaused(rdt) {
+  const B = G.B;
+  if (!B) { updateCamera(rdt); UI.update(rdt); return; }
+  beginParts(); G.hbars.length = 0;
+  updateFX(rdt, G.t);
+  const live = G.phase === 'play' || G.phase === 'defeat' || G.phase === 'clear';
+  if (live) {
+    for (const t of G.towers) if (t.alive) t.updatePaused(rdt);
+    updateProjectiles(0);
+    for (const m of G.mons) if (!m.dead) drawMonster(m, G.t);
+    for (const f of G.men) if (!f.dead) drawFootman(f);
+    if (G.phase === 'play') {
+      const k0 = (G.gold >= DNA_COSTS[0] ? 1 : .5) * (UI.manual ? 1.25 : 1);
+      for (let i = 0; i < B.pads.length; i++) {
+        const p = B.pads[i]; if (p.tower) continue;
+        _mm.compose(_mv.set(p.x, p.y, p.z), _mq.setFromAxisAngle(_upv, p.face + Math.sin(G.t * 1.3 + i * 2.1) * .3), _ms); KIT.marker.put(_mm, 0, null);
+        const w = .5 + .5 * Math.sin(G.t * 2.1 + i * 1.7), sz = 3.7 + .25 * w, a = (.55 + .45 * w) * k0;
+        FX.add.push(p.x, p.y + .07, p.z, sz, sz, 0, 0, 2.6, 1.6, .55, a, 4, 0, .52, 1);
+      }
+    }
+  }
+  updateDebris(0, FX.groundAt, () => {});
+  updateCamera(rdt);
+  updateLights(rdt, G.t, CAM.x, CAM.z);
+  _torch.length = 0;
+  for (const m of G.mons) if ((m.torch || m.glowL) && !m.dead && m.vis) _torch.push(m);
+  for (const f of G.men) if (f.torch && !f.dead) _torch.push(f);
+  for (const a of G.arrows) _torch.push(a);
+  updateTorchLights(0, _torch, CAM.x, CAM.z);
+  collectMistLights();
+  endParts(); endFX();
+  UI.update(rdt);
+  if (AU.ready) {
+    let lit = 0; for (const t of G.towers) if (t.alive && t.em.on > .5) lit++;
+    AU.setAmbience(sat((.3 + lit * .06) * LT.beaconOn + .05), sat((G.phase === 'play' ? .5 : .85) * B.bio.wind), G.bossAlive && G.phase === 'play' ? 1 : 0);
+    AU.update(rdt);
+  }
+}
+
 let _last = 0, _acc = 0, _frames = 0, _slow = 0, _fast = 0, _hold = 0, _back = 12;
 function frame(now) {
   requestAnimationFrame(frame);
   if (now - _last < 10.5) return;
   const raw = (now - _last) / 1000, rdt = Math.min(.05, Math.max(.001, raw)); _last = now; R.frameDt = rdt;
-  if (G.paused) { updateCamera(rdt); UI.update(rdt); } else for (let i = 0; i < G.speed; i++) step(rdt);
+  if (G.paused) stepPaused(rdt); else for (let i = 0; i < G.speed; i++) step(rdt);
   R.fade = Math.min(1, R.fade + rdt * 1.6);
   applyCamera(); renderFrame(); UI.draw();
   if (document.hidden || raw > .25) { _acc = 0; _frames = 0; return; }
@@ -163,6 +202,7 @@ function boot() {
   const B = G.B = buildBoard(G.boardSeed++, G.boardIndex++);
   R.scene.add(B.group); activateBoard(B, true);
   beginBattle(true);
+  if (G.paused && !HASH.ff) step(1 / 60);
   window.addEventListener('resize', resizeRenderer);
   window.addEventListener('orientationchange', () => setTimeout(resizeRenderer, 120));
   if (window.visualViewport) window.visualViewport.addEventListener('resize', resizeRenderer);

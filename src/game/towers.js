@@ -161,13 +161,13 @@ class Tower {
   begin() {
     const bp = blueprint(this.kind, this.lvl); this.bp = bp; this.mounts = bp.mounts; this.bt = 0; this.state = 'build';
     this.clearModel(true);
-    if (G.paused) { for (const p of bp.pieces) this.pieces.push({ mesh: new THREE.Mesh(p.soup.build(), MAT.world), y: p.y, t0: 0, landed: true, soup: p.soup }); this.finish(); this.appear = 1; return; }
     const n = bp.pieces.length, gap = Math.min(.2, 1.2 / n);
     bp.pieces.forEach((p, i) => {
       const mesh = new THREE.Mesh(p.soup.build(), MAT.world); mesh.castShadow = mesh.receiveShadow = true; mesh.visible = false; mesh.position.y = p.y + 2.2;
       this.group.add(mesh); this.pieces.push({ mesh, y: p.y, t0: .25 + i * gap, landed: false, soup: p.soup });
     });
     this.tEnd = .25 + n * gap + .28;
+    this.tPauseHold = this.tEnd - .23;
     this.scaf = new THREE.Mesh(scaffoldGeo(1.2, 1.9), MAT.world); this.scaf.castShadow = true; this.scaf.scale.set(1, .01, 1); this.group.add(this.scaf);
     fxDust(this.x, this.y + .1, this.z, 7, 1.0, { speed: 1.6 });
     sfx('hammer', this.x, this.z, .8, .3);
@@ -246,28 +246,26 @@ class Tower {
   }
   mutate(elem = 'fire') {
     if (this.dna.length >= 4 || !this.alive) return false;
-    if (this.state !== 'active') { this.finish(); this.appear = 1; }
     this.dna.push(elem);
     this.lvl = this.dna.length;
     this.spent += DNA_COSTS[this.lvl];
     this.prof = catProfile(this.dna);
-    if (this.cat) {
-      this.cat.mutatePuff = 1.0;
-      if (G.paused) { this.cat.scaleCur = this.prof.scale; this.cat.e.scale = this.prof.scale; }
-      const pr = this.prof;
-      this.em.I = pr.light;
-      this.em.r = pr.col[0]; this.em.g = pr.col[1]; this.em.b = pr.col[2];
-      const p = this.w([0, this.mounts.catY + .35, this.cat.ext * this.mounts.reach], _ap);
-      if (elem === 'elec') {
-        fxSparks(p.x, p.y, p.z, 12 + this.lvl * 4, 4.2, .4, 2.0, 3.2, { size: .06, grav: 3 });
-        fxTimed(2, p.x, p.y, p.z, 2.0 + this.lvl * .25, 2.0 + this.lvl * .25, .4, 1.8, 3.0, .9, .24);
-        sfx('zap', p.x, p.z, .7, .5 + this.lvl * .12);
-      } else {
-        fxSparks(p.x, p.y, p.z, 12 + this.lvl * 4, 4.2, 3.0, 1.4, .3, { size: .06, grav: 4 });
-        fxTimed(5, p.x, p.y, p.z, 1.8 + this.lvl * .25, 1.8 + this.lvl * .25, 3.0, 1.4, .3, .9, .24);
-        sfx('ignite', p.x, p.z, .85, .6 + this.lvl * .1);
-      }
+    const pr = this.prof;
+    this.em.I = pr.light;
+    this.em.r = pr.col[0]; this.em.g = pr.col[1]; this.em.b = pr.col[2];
+    const extZ = this.cat ? this.cat.ext * this.mounts.reach : 0;
+    const p = this.w([0, this.mounts.catY + .35, extZ], _ap);
+    const mp = clamp((this.lvl - 1) / 3, 0, 1);
+    if (elem === 'elec') {
+      fxSparks(p.x, p.y, p.z, 12 + this.lvl * 4, 4.2, .4, 2.0, 3.2, { size: .06, grav: 3 });
+      fxTimed(2, p.x, p.y, p.z, 2.0 + this.lvl * .25, 2.0 + this.lvl * .25, .4, 1.8, 3.0, .9, .24);
+      sfx('catMut', p.x, p.z, .85, mp);
+    } else {
+      fxSparks(p.x, p.y, p.z, 12 + this.lvl * 4, 4.2, 3.0, 1.4, .3, { size: .06, grav: 4 });
+      fxTimed(5, p.x, p.y, p.z, 1.8 + this.lvl * .25, 1.8 + this.lvl * .25, 3.0, 1.4, .3, .9, .24);
+      sfx('catMut', p.x, p.z, .85, mp);
     }
+    if (this.cat) this.cat.mutatePuff = 1.0;
     return true;
   }
   upgrade(elem = 'fire') { return this.mutate(elem); }
@@ -276,6 +274,54 @@ class Tower {
     for (let i = 0; i < 12; i++) { _tm.compose(_tv.set(this.x + rr(-.6, .6), this.y + rr(.3, 1.8), this.z + rr(-.6, .6)), _tq.set(rr(-1, 1), rr(-1, 1), rr(-1, 1), 1).normalize(), _ts.set(.9, .9, .9)); addDebris(KIT.rubble, _tm, null, rr(-2, 2), rr(1, 4), rr(-2, 2), rr(3, 9), rr(2, 3.2)); }
     fxDust(this.x, this.y + .4, this.z, 14, 1.5, { speed: 2.4 }); sfx('sell', this.x, this.z, 1);
     this.clearModel(false); R.scene.remove(this.group);
+  }
+  updatePaused(rdt) {
+    if (this.state !== 'active') {
+      const hold = this.tPauseHold || (this.tEnd - .23);
+      if (this.bt < hold) {
+        this.bt = Math.min(hold, this.bt + rdt);
+        const bt = this.bt;
+        if (this.scaf) this.scaf.scale.y = bt < this.tEnd - .22 ? easeOutBack(bt / .26) : Math.max(.01, 1 - (bt - (this.tEnd - .22)) / .22);
+        for (const p of this.pieces) {
+          const u = (bt - p.t0) / .22;
+          if (u < 0) continue;
+          p.mesh.visible = true;
+          if (u < 1) p.mesh.position.y = p.y + (1 - u * u) * 2.0;
+          else {
+            p.mesh.position.y = p.y;
+            const sq = clamp((u - 1) / .45, 0, 1);
+            p.mesh.scale.y = 1 - .1 * Math.sin(sq * PI) * (1 - sq);
+            if (!p.landed) {
+              p.landed = true;
+              fxDust(this.x + rr(-.4, .4), this.y + p.y + .1, this.z + rr(-.4, .4), 3, .5, { speed: 1.2, a: .4 });
+              sfx('hammer', this.x, this.z, .7, rnd());
+            }
+          }
+        }
+      }
+      this.em.on = damp(this.em.on, 0, 4, rdt);
+      return;
+    }
+    const c = this.cat;
+    if (!c) return;
+    const pr = this.prof, lvl = this.lvl, isElec = pr.model === 'elec';
+    this.appear = Math.min(1, this.appear + rdt * 2.4);
+    this.em.on = damp(this.em.on, this.stun > 0 ? .12 : 1, 3, rdt);
+    c.scaleCur = damp(c.scaleCur, pr.scale, 10, rdt);
+    c.mutatePuff = Math.max(0, c.mutatePuff - rdt * 2.8);
+    const p = this.w([0, this.mounts.catY, c.ext * this.mounts.reach], _ap), e = c.e;
+    e.x = p.x; e.y = p.y - (1 - easeOut(this.appear)) * .35; e.z = p.z;
+    this.em.x = p.x; this.em.z = p.z;
+    e.scale = c.scaleCur * (.35 + .65 * this.appear);
+    e.yaw = c.yaw; e.pitch = c.pitch; e.swipe = c.swipe; e.pawSide = c.pawSide;
+    e.hitDist = c.hitDist; e.hitDy = c.hitDy; e.mutatePuff = c.mutatePuff;
+    if (isElec) rigGattoElettrico(e, lvl);
+    else {
+      if (this.monocle) this.monocle.visible = false;
+      if (this.aura) this.aura.visible = false;
+      if (pr.model === 'fire') rigGattoFuoco(e, lvl);
+      else rigGattoGraffiatore(e);
+    }
   }
   update(dt) {
     this.recent = Math.max(0, this.recent - dt * .25);
@@ -383,7 +429,7 @@ class Tower {
         );
       }
       fxSparks(hx, hy, hz, 6, 3.2, 1.5, 1.5, 1.5, { size: .045, grav: 4 });
-      sfx('arrowHit', hx, hz, .65, .85 + rnd() * .25);
+      sfx('catClaw', hx, hz, .75, rnd());
       hitMonster(tgt, pr.dmg, 'claw', sn, cs, this);
     } else if (isElec) {
       // Attacco Laser istantaneo dal monocolo olografico!
@@ -395,7 +441,9 @@ class Tower {
       fxTimed(2, hx, hy, hz, pr.plasma ? 1.8 : 1.0, pr.plasma ? 1.8 : 1.0, col[0], col[1], col[2], .95, .14);
       fxSparks(hx, hy, hz, pr.plasma ? 12 : 6, pr.plasma ? 4.5 : 3.2, col[0], col[1], col[2], { size: .05, grav: 2 });
       if (pr.plasma) lightFlash(hx, hy, hz, 0xe879f9, 360, .18, 12);
-      sfx('zap', sx, sz, pr.plasma ? .85 : .42, .65 + lvl * .08 + rnd() * .15);
+      if (pr.plasma) sfx('catPlasma', sx, sz, .85, .5);
+      else if (pr.burnBonus) sfx('catPyro', sx, sz, .78, .7);
+      else sfx('catLaser', sx, sz, .78, clamp((lvl - 1) / 3, 0, 1));
       const l = Math.hypot(hx - sx, hz - sz) || 1;
       hitMonster(tgt, pr.dmg, 'bolt', (hx - sx) / l, (hz - sz) / l, this);
     } else {
@@ -414,7 +462,7 @@ class Tower {
       });
       fxTimed(3, sx, sy, sz, .55, .55, 3.5, 2.0, .6, .9, .14);
       fxSparks(sx, sy, sz, 4, 2.8, 3.0, 1.5, .4, { size: .04, grav: 3 });
-      sfx('ignite', sx, sz, .38, .85 + rnd() * .25);
+      sfx('catFire', sx, sz, .75, clamp((lvl - 1) / 3, 0, 1));
     }
   }
   dispose() { this.alive = false; this.em.alive = false; LT.emitters[this.idx] = null; this.clearModel(false); R.scene.remove(this.group); this.pad.tower = null; }
@@ -443,15 +491,16 @@ function updateProjectiles(dt) {
     FX.add.push(s.x, s.y, s.z, .55 * fsc, .55 * fsc, 0, 0, 3.2, 1.3, .25, 1, 0, 0, 0, 0);
     s.sm += dt * 36;
     while (s.sm > 1) { s.sm -= 1; fxPart(s.x + rr(-.06, .06), s.y + rr(-.06, .06), s.z + rr(-.06, .06), rr(-.4, .4), rr(.1, .7), rr(-.4, .4), rr(.2, .45), .055, 2.8, 1.1, .2, { drag: 1.5, rise: .5 }); }
-    if (u >= 1) { swapRemove(Sh, i); explodeAt(s.tx, s.ty, s.tz, s.dmg, s.splash, s.tower, s.miniStun); }
+    if (u >= 1) { swapRemove(Sh, i); explodeAt(s.tx, s.ty, s.tz, s.dmg, s.splash, s.tower, s.miniStun, s.lvl || 1); }
   }
 }
 
-function explodeAt(x, y, z, dmg, splash, tower, miniStun = false) {
+function explodeAt(x, y, z, dmg, splash, tower, miniStun = false, lvl = 1) {
   const sc = splash / 1.55;
   fxExplosion(x, y, z, sc);
   FX.decals.add(G.B.heightAt, x, z, splash * 1.15, .016, .013, .011, .55, 20);
-  sfx('explode', x, z, .45, clamp(sc - .5, 0, 1));
+  if (miniStun) sfx('catMagma', x, z, .78, .7);
+  else sfx('catBoom', x, z, .78, clamp((lvl - 1) / 3, 0, 1));
   for (const m of G.mons) {
     if (m.dead || m.hp <= 0 || m.fly || !m.vis) continue;
     const d = Math.hypot(m.x - x, m.z - z); if (d > splash + m.rad) continue;
